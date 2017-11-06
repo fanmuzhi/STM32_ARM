@@ -272,7 +272,7 @@ static int8_t CDC_Receive_FS (uint8_t* Buf, uint32_t *Len)
   /* USER CODE BEGIN 6 */
 	s_RxBuff.IsCommandDataReceived = 1; //indicates data were received
 	s_RxBuff.CommandsLens = *Len; //only set the length, data was directly saved to buffer
-//	memcpy(s_RxBuff.UserRxBufferFS, Buf, *Len);  
+	memcpy(s_RxBuff.UserRxBufferFS, Buf, *Len);  
 	 
 	//prepare to receive the next data
 	USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);

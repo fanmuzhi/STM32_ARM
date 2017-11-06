@@ -78,7 +78,10 @@
 #define CPT_IO23_GPIO_Port GPIOG
 
 /* USER CODE BEGIN Private defines */
-
+#define SET_LED_WHITE 0x10
+#define SET_LED_IR 0x11
+#define GET_LED_WHITE 0x20
+#define GET_LED_IR 0x21
 /* USER CODE END Private defines */
 
 void _Error_Handler(char *, int);
