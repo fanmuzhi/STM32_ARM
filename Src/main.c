@@ -199,27 +199,27 @@ int main(void)
 //		uint8_t *hexbuffer;
 //		uint32_t pos32;
 //		char *textbuf;
-		int i_temp0 = 0;
+//		int i_temp0 = 0;
 
 		VCP_CMD_process( );
-	
-		HAL_Delay(10);//it is better to delay a little bit time, 0.1ms up to a few ms
-		i_temp0++;
-		vTurnOnLed(&led_R, 255);
-		HAL_Delay(100);
-		vTurnOffLed(&led_R);
-		HAL_Delay(100);
-		//CDC_Transmit_FS( UserTxBuffer,  sizeof(UserTxBuffer) );
+//	
+//		HAL_Delay(10);//it is better to delay a little bit time, 0.1ms up to a few ms
+//		i_temp0++;
+//		vTurnOnLed(&led_R, 255);
+//		HAL_Delay(100);
+//		vTurnOffLed(&led_R);
+//		HAL_Delay(100);
+//		//CDC_Transmit_FS( UserTxBuffer,  sizeof(UserTxBuffer) );
 
-//		uint8_t pTxData[4] = {0x11,0x22,0x33,0x44};
-//		uint8_t pRxData[4];
-// 		HAL_SPI_TransmitReceive(&hspi1, pTxData, pRxData, 4, 2000);
-	
-		uint8_t cmd[5] = {0x11,0x22,0x33,0x44, 0xff};
-		if(HAL_SPI_Transmit(&hspi1, cmd, 5, 1000) == HAL_OK)
-		{
-			HAL_Delay(100);
-		}
+////		uint8_t pTxData[4] = {0x11,0x22,0x33,0x44};
+////		uint8_t pRxData[4];
+//// 		HAL_SPI_TransmitReceive(&hspi1, pTxData, pRxData, 4, 2000);
+//	
+//		uint8_t cmd[5] = {0x11,0x22,0x33,0x44, 0xff};
+//		if(HAL_SPI_Transmit(&hspi1, cmd, 5, 1000) == HAL_OK)
+//		{
+//			HAL_Delay(100);
+//		}
   }
   /* USER CODE END 3 */
 
@@ -737,7 +737,7 @@ int8_t VCP_CMD_process()
 			switch(s_RxBuff.UserRxBufferFS[0])
 			{ 
 				case SET_LED_WHITE:
-//						vTurnOnRedLight(s_RxBuff.UserRxBufferFS[1]);
+					vTurnOnLed(&led_R, s_RxBuff.UserRxBufferFS[1]);
 					break;
 				
 				case GET_LED_WHITE:
@@ -746,7 +746,7 @@ int8_t VCP_CMD_process()
 					break;
 				
 				case SET_LED_IR:
-//						vTurnOnBlueLight(s_RxBuff.UserRxBufferFS[1]);
+							vTurnOnLed(&led_B, s_RxBuff.UserRxBufferFS[1]);
 					break;
 				
 				case GET_LED_IR:
