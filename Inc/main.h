@@ -56,28 +56,56 @@
 
 /* Private define ------------------------------------------------------------*/
 
-#define K2_Pin GPIO_PIN_13
-#define K2_GPIO_Port GPIOC
-#define K2_EXTI_IRQn EXTI15_10_IRQn
-#define LCD_BL_Pin GPIO_PIN_9
-#define LCD_BL_GPIO_Port GPIOF
-#define K1_Pin GPIO_PIN_0
-#define K1_GPIO_Port GPIOA
-#define K1_EXTI_IRQn EXTI0_IRQn
-#define LCD_RST_Pin GPIO_PIN_11
-#define LCD_RST_GPIO_Port GPIOF
-#define CPT_IO27_Pin GPIO_PIN_8
-#define CPT_IO27_GPIO_Port GPIOG
-#define CPT_IO26_Pin GPIO_PIN_3
-#define CPT_IO26_GPIO_Port GPIOD
-#define CPT_IO25_Pin GPIO_PIN_6
-#define CPT_IO25_GPIO_Port GPIOD
-#define CPT_IO24_Pin GPIO_PIN_7
-#define CPT_IO24_GPIO_Port GPIOD
-#define CPT_IO23_Pin GPIO_PIN_9
-#define CPT_IO23_GPIO_Port GPIOG
+#define VCC_200mV_Pin GPIO_PIN_2
+#define VCC_200mV_GPIO_Port GPIOE
+#define VCC_400mV_Pin GPIO_PIN_3
+#define VCC_400mV_GPIO_Port GPIOE
+#define VCC_800mV_Pin GPIO_PIN_4
+#define VCC_800mV_GPIO_Port GPIOE
+#define VCC_1600mV_Pin GPIO_PIN_5
+#define VCC_1600mV_GPIO_Port GPIOE
+#define VCC_PG_Pin GPIO_PIN_8
+#define VCC_PG_GPIO_Port GPIOI
+#define SPIVCC_PG_Pin GPIO_PIN_9
+#define SPIVCC_PG_GPIO_Port GPIOI
+#define VCC_EN_Pin GPIO_PIN_10
+#define VCC_EN_GPIO_Port GPIOI
+#define SPIVCC_EN_Pin GPIO_PIN_11
+#define SPIVCC_EN_GPIO_Port GPIOI
+#define SPIVCC_200mV_Pin GPIO_PIN_0
+#define SPIVCC_200mV_GPIO_Port GPIOC
+#define SPIVCC_100mV_Pin GPIO_PIN_1
+#define SPIVCC_100mV_GPIO_Port GPIOC
+#define SPIVCC_50mV_Pin GPIO_PIN_2
+#define SPIVCC_50mV_GPIO_Port GPIOC
+#define SPIVCC_800mV_Pin GPIO_PIN_3
+#define SPIVCC_800mV_GPIO_Port GPIOC
+#define BUZZER_Pin GPIO_PIN_4
+#define BUZZER_GPIO_Port GPIOH
+#define SPIVCC_400mV_Pin GPIO_PIN_4
+#define SPIVCC_400mV_GPIO_Port GPIOA
+#define SPIVCC_1600mV_Pin GPIO_PIN_5
+#define SPIVCC_1600mV_GPIO_Port GPIOA
+#define R_Pin GPIO_PIN_2
+#define R_GPIO_Port GPIOG
+#define G_Pin GPIO_PIN_3
+#define G_GPIO_Port GPIOG
+#define B_Pin GPIO_PIN_4
+#define B_GPIO_Port GPIOG
+#define VCC_50mV_Pin GPIO_PIN_0
+#define VCC_50mV_GPIO_Port GPIOE
+#define VCC_100mV_Pin GPIO_PIN_1
+#define VCC_100mV_GPIO_Port GPIOE
+#define CALIBRATE_LOW_Pin GPIO_PIN_7
+#define CALIBRATE_LOW_GPIO_Port GPIOI
 
 /* USER CODE BEGIN Private defines */
+#define LED_WHITE	0
+#define	LED_IR    1
+#define SET_LED_WHITE	0x10
+#define SET_LED_IR		0x11
+#define GET_LED_WHITE 0x20
+#define GET_LED_IR		0x21
 
 /* USER CODE END Private defines */
 
