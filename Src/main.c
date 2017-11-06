@@ -60,30 +60,31 @@ ADC_HandleTypeDef hadc3;
 
 I2C_HandleTypeDef hi2c2;
 
+SPI_HandleTypeDef hspi1;
+SPI_HandleTypeDef hspi5;
+
 TIM_HandleTypeDef htim10;
 TIM_HandleTypeDef htim11;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-//typedef struct{
-//	TIM_HandleTypeDef *tim_handle;
-//	uint32_t					tim_channel;
-//}led_Timer_t;
+typedef struct{
+	TIM_HandleTypeDef *tim_handle;
+	uint32_t					tim_channel;
+}Timer_Led_t;
 
-//led_Timer_t led_R;
-//led_Timer_t led_G;
-//led_Timer_t led_B;
-//led_Timer_t led_W;
-//led_Timer_t led_IR;
+Timer_Led_t led_W;
+Timer_Led_t led_IR;
 
 typedef struct{
-	TIM_HandleTypeDef *gpio_x;
-	uint32_t					gpio_pin;
-}RGB_led_Gpio_t;
+	GPIO_TypeDef *gpio_x;
+	uint16_t			gpio_pin;
+}Gpio_RGB_Led_t;
 
-led_Gpio_t led_R;
-led_Gpio_t led_G;
-led_Gpio_t led_B;
+Gpio_RGB_Led_t led_R;
+Gpio_RGB_Led_t led_G;
+Gpio_RGB_Led_t led_B;
+
 uint8_t UserTxBuffer[] = "---K1 button clicked--- \n";
 
 /* USER CODE END PV */
@@ -95,6 +96,8 @@ static void MX_ADC3_Init(void);
 static void MX_TIM10_Init(void);
 static void MX_TIM11_Init(void);
 static void MX_I2C2_Init(void);
+static void MX_SPI5_Init(void);
+static void MX_SPI1_Init(void);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
                                 
@@ -102,16 +105,12 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-
-//void vTurnOnLed( unsigned char ucLightness );
-void vTurnOnLed( led_Timer_t *ledTimer, unsigned char ucLightness );
-void vTurnOffLed( led_Timer_t *ledTimer);
-//void vTurnOnRedLight( unsigned char ucPulseLenth );
-//void vTurnOnGreenLight( unsigned char ucPulseLenth );
-//void vTurnOnBlueLight( unsigned char ucPulseLenth );
-//void vTurnOffRedLight(void);
-//void vTurnOffGreenLight(void);
-//void vTurnOffBlueLight(void);
+void vTurnOnRgbLed( uint16_t r, uint16_t g, uint16_t b );
+void vTurnOffRgbLed(void);
+	
+void vTurnOnLed( Timer_Led_t *ledTimer, uint16_t ucLightness );
+void vTurnOffLed( Timer_Led_t *ledTimer);
+uint32_t GetLightness( void );
 int8_t VCP_CMD_process( void );
 //extern uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 
@@ -126,16 +125,18 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-	led_R.tim_handle = &htim10;
-	led_R.tim_channel = TIM_CHANNEL_1;
-	led_G.tim_handle = &htim11;
-	led_G.tim_channel = TIM_CHANNEL_1;
-	led_B.tim_handle = &htim13;
-	led_B.tim_channel = TIM_CHANNEL_1;
-	led_W.tim_handle = &htim4;
-	led_W.tim_channel = TIM_CHANNEL_3;
-	led_IR.tim_handle = &htim4;
-	led_IR.tim_channel = TIM_CHANNEL_4;
+	led_R.gpio_x = GPIOG;
+	led_R.gpio_pin = GPIO_PIN_2;
+	led_G.gpio_x = GPIOG;
+	led_G.gpio_pin = GPIO_PIN_3;
+	led_B.gpio_x = GPIOG;
+	led_B.gpio_pin = GPIO_PIN_4;
+	
+	led_W.tim_handle = &htim10;
+	led_W.tim_channel = TIM_CHANNEL_1;
+	led_IR.tim_handle = &htim11;
+	led_IR.tim_channel = TIM_CHANNEL_1;
+	
   /* USER CODE END 1 */
 
   /* MCU Configuration----------------------------------------------------------*/
@@ -161,6 +162,8 @@ int main(void)
   MX_TIM10_Init();
   MX_TIM11_Init();
   MX_I2C2_Init();
+  MX_SPI5_Init();
+  MX_SPI1_Init();
 
   /* USER CODE BEGIN 2 */
 
@@ -168,17 +171,14 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-	uint32_t adc1_val, adc2_val;
-	HAL_ADC_Start(&hadc1);
-	adc1_val = HAL_ADC_GetValue(&hadc1);
-	HAL_ADC_Start(&hadc2);
-	adc2_val = HAL_ADC_GetValue(&hadc2);
+	vTurnOnRgbLed(1, 1, 1);
+
 	vTurnOnLed(&led_W, 100);
-	vTurnOnLed(&led_IR, 125);
+//	vTurnOnLed(&led_IR, 125);
 	vTurnOffLed(&led_W);
-	vTurnOffLed(&led_IR);
-	HAL_ADC_Stop(&hadc1);
-	HAL_ADC_Stop(&hadc2);
+//	vTurnOffLed(&led_IR);
+
+	HAL_ADC_Start(&hadc3);
 	HAL_Delay(100);
 
   while (1)
@@ -186,36 +186,32 @@ int main(void)
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
-
-//		uint8_t *hexbuffer;
-//		uint32_t pos32;
-//		char *textbuf;
-		int i_temp0 = 0;
-
+		
 		VCP_CMD_process( );
 	
-		HAL_Delay(10);//it is better to delay a little bit time, 0.1ms up to a few ms
-		i_temp0++;
-		vTurnOnLed(&led_R, 255);
-		HAL_Delay(100);
-		vTurnOffLed(&led_R);
-		HAL_Delay(100);
+//		HAL_Delay(10);//it is better to delay a little bit time, 0.1ms up to a few ms
+		uint32_t lightness;
+		lightness = GetLightness();
+		vTurnOnLed(&led_W, GetLightness());
+//		HAL_Delay(100);
+//		vTurnOffLed(&led_W);
+//		HAL_Delay(100);
 		//CDC_Transmit_FS( UserTxBuffer,  sizeof(UserTxBuffer) );
 
-		uint8_t pTxData[4] = {0x11,0x22,0x33,0x44};
-		uint8_t pRxData[8];
- 		HAL_SPI_TransmitReceive(&hspi1, pTxData, pRxData, 8, 2000);
-	
-		uint8_t cmd[5] = {0x11,0x22,0x33,0x44, 0xff};
-		if(HAL_SPI_Transmit(&hspi1, cmd, 5, 1000) == HAL_OK)
-		{
-			
-		}
-		uint8_t pRxData2[5];
-		if(HAL_SPI_Receive(&hspi1, pRxData2, 5, 1000) == HAL_OK)
-		{
-			HAL_Delay(100);
-		}
+//		uint8_t pTxData[4] = {0x01,0xff,0xff,0xff};
+//		uint8_t pRxData[8];
+// 		HAL_SPI_TransmitReceive(&hspi1, pTxData, pRxData, 8, 2000);
+//	
+//		uint8_t cmd[5] = {0x11,0x22,0x33,0x44, 0xff};
+//		if(HAL_SPI_Transmit(&hspi1, cmd, 5, 1000) == HAL_OK)
+//		{
+//			
+//		}
+//		uint8_t pRxData2[5];
+//		if(HAL_SPI_Receive(&hspi1, pRxData2, 5, 1000) == HAL_OK)
+//		{
+//			HAL_Delay(100);
+//		}
   }
   /* USER CODE END 3 */
 
@@ -234,7 +230,7 @@ void SystemClock_Config(void)
     */
   __HAL_RCC_PWR_CLK_ENABLE();
 
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
 
     /**Initializes the CPU, AHB and APB busses clocks 
     */
@@ -242,10 +238,10 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 336;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 72;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 7;
+  RCC_OscInitStruct.PLL.PLLQ = 3;
   RCC_OscInitStruct.PLL.PLLR = 2;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -258,10 +254,10 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
@@ -342,6 +338,54 @@ static void MX_I2C2_Init(void)
 
 }
 
+/* SPI1 init function */
+static void MX_SPI1_Init(void)
+{
+
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_HARD_OUTPUT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+}
+
+/* SPI5 init function */
+static void MX_SPI5_Init(void)
+{
+
+  /* SPI5 parameter configuration*/
+  hspi5.Instance = SPI5;
+  hspi5.Init.Mode = SPI_MODE_MASTER;
+  hspi5.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi5.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi5.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi5.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi5.Init.NSS = SPI_NSS_HARD_OUTPUT;
+  hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi5.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi5.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi5.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi5.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi5) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+}
+
 /* TIM10 init function */
 static void MX_TIM10_Init(void)
 {
@@ -351,7 +395,7 @@ static void MX_TIM10_Init(void)
   htim10.Instance = TIM10;
   htim10.Init.Prescaler = 0;
   htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim10.Init.Period = 255;
+  htim10.Init.Period = 4095;
   htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
   {
@@ -364,7 +408,7 @@ static void MX_TIM10_Init(void)
   }
 
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 25;
+  sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim10, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -385,7 +429,7 @@ static void MX_TIM11_Init(void)
   htim11.Instance = TIM11;
   htim11.Init.Prescaler = 0;
   htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim11.Init.Period = 0;
+  htim11.Init.Period = 4095;
   htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim11) != HAL_OK)
   {
@@ -440,13 +484,11 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOI, VCC_EN_Pin|SPIVCC_EN_Pin|CALIBRATE_LOW_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, SPIVCC_200mV_Pin|SPIVCC_100mV_Pin|SPIVCC_50mV_Pin|SPIVCC_800mV_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, SPIVCC_200mV_Pin|SPIVCC_100mV_Pin|SPIVCC_50mV_Pin|SPIVCC_800mV_Pin 
+                          |SPIVCC_400mV_Pin|SPIVCC_1600mV_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, SPIVCC_400mV_Pin|SPIVCC_1600mV_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOG, R_Pin|G_Pin|B_Pin, GPIO_PIN_RESET);
@@ -473,8 +515,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOI, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SPIVCC_200mV_Pin SPIVCC_100mV_Pin SPIVCC_50mV_Pin SPIVCC_800mV_Pin */
-  GPIO_InitStruct.Pin = SPIVCC_200mV_Pin|SPIVCC_100mV_Pin|SPIVCC_50mV_Pin|SPIVCC_800mV_Pin;
+  /*Configure GPIO pins : SPIVCC_200mV_Pin SPIVCC_100mV_Pin SPIVCC_50mV_Pin SPIVCC_800mV_Pin 
+                           SPIVCC_400mV_Pin SPIVCC_1600mV_Pin */
+  GPIO_InitStruct.Pin = SPIVCC_200mV_Pin|SPIVCC_100mV_Pin|SPIVCC_50mV_Pin|SPIVCC_800mV_Pin 
+                          |SPIVCC_400mV_Pin|SPIVCC_1600mV_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -486,13 +530,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(BUZZER_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : SPIVCC_400mV_Pin SPIVCC_1600mV_Pin */
-  GPIO_InitStruct.Pin = SPIVCC_400mV_Pin|SPIVCC_1600mV_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : R_Pin G_Pin B_Pin */
   GPIO_InitStruct.Pin = R_Pin|G_Pin|B_Pin;
@@ -513,14 +550,12 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 uint32_t GetLightness( void )
 {
-	uint32_t adc1_val, adc2_val;
-	
-	HAL_ADC_Start(&hadc1);
-	HAL_ADC_Start(&hadc2);
-	adc1_val = HAL_ADC_GetValue(&hadc1);
-	adc2_val = HAL_ADC_GetValue(&hadc2);
-	return adc2_val;
+	uint32_t adc3_val;
+	HAL_ADC_Start(&hadc3);
+	adc3_val = HAL_ADC_GetValue(&hadc3);
+	return adc3_val;
 }		
+
 
 int8_t VCP_CMD_process()
 {
@@ -571,7 +606,44 @@ int8_t VCP_CMD_process()
     return 1;
 }
 
-void vTurnOnLed( led_Timer_t *ledTimer, unsigned char ucLightness )
+void vTurnOnRgbLed( uint16_t r, uint16_t g, uint16_t b )
+{
+//	if(r == 1)
+//	{
+		HAL_GPIO_WritePin(led_R.gpio_x, led_R.gpio_pin, GPIO_PIN_SET);
+//	}
+//	else
+//	{
+//		HAL_GPIO_WritePin(led_R.gpio_x, led_R.gpio_pin, GPIO_PIN_RESET);
+//	}
+//	
+//	if(g == 1)
+//	{
+		HAL_GPIO_WritePin(led_G.gpio_x, led_G.gpio_pin, GPIO_PIN_SET);
+//	}
+//	else
+//	{
+//		HAL_GPIO_WritePin(led_G.gpio_x, led_G.gpio_pin, GPIO_PIN_RESET);
+//	}
+//	
+//	if(b == 1)
+//	{
+		HAL_GPIO_WritePin(led_B.gpio_x, led_B.gpio_pin, GPIO_PIN_SET);
+//	}
+//	else
+//	{
+//		HAL_GPIO_WritePin(led_B.gpio_x, led_B.gpio_pin, GPIO_PIN_RESET);
+//	}
+}
+
+void vTurnOffRgbLed(void)
+{
+		HAL_GPIO_WritePin(led_R.gpio_x, led_R.gpio_pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(led_G.gpio_x, led_G.gpio_pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(led_B.gpio_x, led_B.gpio_pin, GPIO_PIN_RESET);
+}
+
+void vTurnOnLed( Timer_Led_t *ledTimer, uint16_t ucLightness )
 {
   TIM_OC_InitTypeDef sConfigOC;
                
@@ -582,7 +654,7 @@ void vTurnOnLed( led_Timer_t *ledTimer, unsigned char ucLightness )
 	}
                
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = ( uint32_t )( 255 - ucLightness );
+  sConfigOC.Pulse = ( uint32_t )( ledTimer->tim_handle->Init.Period - ucLightness );
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
@@ -596,7 +668,7 @@ void vTurnOnLed( led_Timer_t *ledTimer, unsigned char ucLightness )
 		//Error_Handler();
 	}              
 }
-void vTurnOffLed( led_Timer_t *ledTimer)
+void vTurnOffLed( Timer_Led_t *ledTimer)
 {               
 	if(HAL_TIM_PWM_Start(ledTimer->tim_handle, ledTimer->tim_channel) == HAL_OK)
 	{
@@ -614,7 +686,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   if(GPIO_Pin == GPIO_PIN_0)
   {
     /* Toggle LED1 */
-    vTurnOffLed(&led_R);
+    vTurnOffLed(&led_W);
 		CDC_Transmit_FS( UserTxBuffer,  sizeof(UserTxBuffer) );
   }  
 }
