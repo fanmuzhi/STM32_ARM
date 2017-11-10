@@ -92,6 +92,12 @@
 #define G_GPIO_Port GPIOG
 #define B_Pin GPIO_PIN_4
 #define B_GPIO_Port GPIOG
+#define KEY2_Pin GPIO_PIN_9
+#define KEY2_GPIO_Port GPIOC
+#define KEY2_EXTI_IRQn EXTI9_5_IRQn
+#define KEY1_Pin GPIO_PIN_1
+#define KEY1_GPIO_Port GPIOI
+#define KEY1_EXTI_IRQn EXTI1_IRQn
 #define VCC_50mV_Pin GPIO_PIN_0
 #define VCC_50mV_GPIO_Port GPIOE
 #define VCC_100mV_Pin GPIO_PIN_1
@@ -100,12 +106,14 @@
 #define CALIBRATE_LOW_GPIO_Port GPIOI
 
 /* USER CODE BEGIN Private defines */
-#define LED_WHITE	0
-#define	LED_IR    1
-#define SET_LED_WHITE	0x10
-#define SET_LED_IR		0x11
-#define GET_LED_WHITE 0x20
-#define GET_LED_IR		0x21
+#define LED_WHITE					0
+#define	LED_IR    				1
+#define VCP_CMD_SET_LED_DN				0x10
+#define VCP_CMD_SET_LED_TIM				0x11
+#define VCP_CMD_GET_LED_DN 					0x20
+
+#define TARGET_LIGHT_VAL			3000
+#define TIME_LED_DELAY	 	100			//	ms, time after waiting the LED intensity stabal after light on
 
 /* USER CODE END Private defines */
 
