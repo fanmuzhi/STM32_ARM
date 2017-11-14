@@ -231,13 +231,13 @@
 #define LED_MAX 									0x0fff
 #define DN_LED_MIN 								0x0000
 #define DN_LED_MAX 								0x0fff
-#define TARGET_LIGHT_DN_VAL				3000
+//#define TARGET_LIGHT_DN_VAL				3000
 #define TIME_LED_DELAY	 					100			//	ms, time after waiting the LED intensity stabal after light on
 #define LIGHT_AUTOADJUST_TIME_MAX	20
 
 // exception error code definitions
 #define NO_ERROR									0xF0000000
-#define SET_LED_EXCEEDED					0xF0000002
+#define SET_LED_EXCEEDED					0xF0000001
 #define DN_EXCEEDED								0xF0000002
 #define ADJUST_TO_TARGET_FAIL			0xF0000003
 
