@@ -51,7 +51,7 @@
 #include "usb_device.h"
 
 /* USER CODE BEGIN Includes */
-#pragma pack(4)
+#pragma pack(8)
 #include "usbd_cdc.h"
 #include "usbd_cdc_if.h"
 /* USER CODE END Includes */
@@ -71,39 +71,57 @@ TIM_HandleTypeDef htim11;
 /* Private variables ---------------------------------------------------------*/
 
 typedef struct{
-	GPIO_TypeDef 				*gpio_x;
-	uint16_t						gpio_pin;
+								GPIO_TypeDef 		*gpio_x;
+								uint16_t				gpio_pin;
 }Gpio_RGB_Led_t;
 
 typedef struct{
-	TIM_HandleTypeDef		*tim_handle;
-	uint32_t						tim_channel;
-	uint8_t							tim_started;
-	uint16_t						last_led_tim_val;
+								TIM_HandleTypeDef		*tim_handle;
+								uint32_t						tim_channel;
+								uint16_t						tim_started;
+								uint16_t						last_led_tim_val;
 }Timer_Led_t;
 
 typedef struct{
-	uint16_t	error;
-	uint16_t	lightnessWDN;
-	uint16_t	lightnessIRDN;
-}VCP_Light_Return_t;
-
-typedef struct{
-	ADC_HandleTypeDef			*gauge_handle;
-	uint16_t							result_dn;
-	uint16_t							gaugeMinScale;
-	uint32_t							error;
+								uint16_t						result_dn;
+								uint16_t						gaugeMinScale;
+								ADC_HandleTypeDef		*gauge_handle;
 }Lightness_Gauge_t;
 
-Timer_Led_t led_W		= {.tim_handle = &htim10, .tim_channel = TIM_CHANNEL_1, .tim_started = 0, .last_led_tim_val = 0};
-Timer_Led_t led_IR	= {.tim_handle = &htim11, .tim_channel = TIM_CHANNEL_1, .tim_started = 0, .last_led_tim_val = 0};
+typedef struct{
+								uint32_t	error_LightW;
+								uint32_t	error_LightIR;
+								uint16_t	lightnessWDN;
+								uint16_t	lightnessIRDN;
+}VCP_Light_Return_t;
 
-Lightness_Gauge_t lightnessGauge	=	{.gauge_handle = &hadc3, .result_dn = 0x0000, .gaugeMinScale = 0x06, .error = 0xffff};
-VCP_Light_Return_t vcp_lightdn_ret	=	{.error = 0xffff, .lightnessWDN = 0xffff, .lightnessIRDN = 0xffff};
+Timer_Led_t led_W		= {	.tim_handle = &htim10, 
+												.tim_channel = TIM_CHANNEL_1, 
+												.tim_started = 0, 
+												.last_led_tim_val = 0};
 
-Gpio_RGB_Led_t led_R = {.gpio_x = GPIOG, .gpio_pin = GPIO_PIN_2};
-Gpio_RGB_Led_t led_G = {.gpio_x = GPIOG, .gpio_pin = GPIO_PIN_3};
-Gpio_RGB_Led_t led_B = {.gpio_x = GPIOG, .gpio_pin = GPIO_PIN_4};
+Timer_Led_t led_IR	= {	.tim_handle = &htim11, 
+												.tim_channel = TIM_CHANNEL_1, 
+												.tim_started = 0, 
+												.last_led_tim_val = 0 };
+
+Lightness_Gauge_t lightnessGauge	=	{	.gauge_handle = &hadc3, 
+																			.result_dn = 0x0000, 
+																			.gaugeMinScale = 0x0C };
+
+VCP_Light_Return_t vcp_lightdn_ret	=	{	.error_LightW = 0xffffffff, 
+																				.error_LightIR = 0xffffffff, 
+																				.lightnessWDN = 0xffff, 
+																				.lightnessIRDN = 0xffff };
+
+Gpio_RGB_Led_t led_R = {.gpio_x = GPIOG, 
+												.gpio_pin = GPIO_PIN_2};
+
+Gpio_RGB_Led_t led_G = {.gpio_x = GPIOG, 
+												.gpio_pin = GPIO_PIN_3};
+
+Gpio_RGB_Led_t led_B = {.gpio_x = GPIOG, 
+												.gpio_pin = GPIO_PIN_4};
 
 uint8_t UserTxBuffer[] = "---K1 button clicked--- \n";
 
@@ -120,6 +138,9 @@ static void MX_SPI5_Init(void);
 static void MX_SPI1_Init(void);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
+                                
+                                
+
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
 void vTurnOnRgbLed( uint16_t r, uint16_t g, uint16_t b );
@@ -130,6 +151,9 @@ uint16_t vTurnOffLed( Timer_Led_t *ledTimer);
 uint16_t GetLightness( Lightness_Gauge_t *lightnessGauge );
 int8_t VCP_CMD_process( void );
 int32_t AutoAdjustLed(Timer_Led_t *ledTimer, Lightness_Gauge_t *lightGauge, uint16_t dn_target);
+
+int iEnableSPIVCC( int iVoltage );
+int iEnableSENSORVCC( int iVoltage );
 //extern uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 /* USER CODE END PFP */
 
@@ -139,10 +163,12 @@ extern s_RxBuff_t s_RxBuff;
 
 int main(void)
 {
+
   /* USER CODE BEGIN 1 */
   /* USER CODE END 1 */
 
   /* MCU Configuration----------------------------------------------------------*/
+
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
@@ -166,7 +192,8 @@ int main(void)
   MX_SPI1_Init();
 
   /* USER CODE BEGIN 2 */
-
+	iEnableSPIVCC( SPIVCC_1V80 );
+	iEnableSENSORVCC( SENSOR_VCC_2V80 ) ;
 	HAL_Delay(10);
   /* USER CODE END 2 */
 
@@ -192,7 +219,7 @@ int main(void)
 	}
   /* USER CODE END WHILE */
 
-  /* USER CODE BEGIN 3 */		
+  /* USER CODE BEGIN 3 */
 
   /* USER CODE END 3 */
 
@@ -550,21 +577,14 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 uint16_t GetLightness( Lightness_Gauge_t *lightnessGauge )
 {
-//	uint32_t result;
-	lightnessGauge->error = 0xffff;
-	lightnessGauge->result_dn = 0xFFFF;
+
+	lightnessGauge->gauge_handle->ErrorCode = 0xff;
+	lightnessGauge->result_dn = 0xffff;
 	HAL_ADC_Start(lightnessGauge->gauge_handle);
-	if(HAL_ADC_PollForConversion(lightnessGauge->gauge_handle, 2000) != HAL_OK)
-	{
-		lightnessGauge->error = lightnessGauge->gauge_handle->ErrorCode;
-		return 1;
-	}
-	else
-	{
-		lightnessGauge->error = lightnessGauge->gauge_handle->ErrorCode;
-		lightnessGauge->result_dn = HAL_ADC_GetValue(lightnessGauge->gauge_handle);
-		return 0;
-	}
+	HAL_ADC_PollForConversion(lightnessGauge->gauge_handle, 2000);
+	lightnessGauge->gauge_handle->ErrorCode = lightnessGauge->gauge_handle->ErrorCode;
+	lightnessGauge->result_dn = HAL_ADC_GetValue(lightnessGauge->gauge_handle);
+	return 0;
 }		
 
 /* VCP command processing function*/
@@ -576,61 +596,65 @@ int8_t VCP_CMD_process()
 		}
     else
 		{
-			vcp_lightdn_ret.error = 0xffff, vcp_lightdn_ret.lightnessIRDN = 0xffff, vcp_lightdn_ret.lightnessWDN = 0xffff;
 			switch(s_RxBuff.UserRxBufferFS[0])
-			{ 
+			{
+				// process cmd set led by digital number needed, and return light digital number
 				case VCP_CMD_SET_LED_DN:
 				{
+					vcp_lightdn_ret.error_LightW	= 0xffffffff, 
+					vcp_lightdn_ret.error_LightIR	= 0xffffffff, 
+					vcp_lightdn_ret.lightnessWDN	= 0xffff;
+					vcp_lightdn_ret.lightnessIRDN	= 0xffff;
 					if(s_RxBuff.UserRxBufferFS[2] >= 0x10 || s_RxBuff.UserRxBufferFS[4] >= 0x10)
 					{
-						vcp_lightdn_ret.error = 0xFFFF;
-						vcp_lightdn_ret.lightnessWDN = 0xFFFF;
-						vcp_lightdn_ret.lightnessIRDN = 0xFFFF;
 						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_ret), sizeof(vcp_lightdn_ret));      //send back the detected light adc value
 						break;
 					}
-
 					uint16_t lightnessW_target = (uint16_t)s_RxBuff.UserRxBufferFS[1] + (((uint16_t)s_RxBuff.UserRxBufferFS[2])<<8);
 					uint16_t lightnessIR_target = (uint16_t)s_RxBuff.UserRxBufferFS[3] + (((uint16_t)s_RxBuff.UserRxBufferFS[4])<<8);
+					
 					//adjust IR Led to lightnessIR_target
+					vTurnOffLed(&led_W);
+//				vTurnOffLed(&led_IR);
 					AutoAdjustLed(&led_IR, &lightnessGauge, lightnessIR_target);
-//					if(lightnessGauge.error != 0)
-//					{
-					vcp_lightdn_ret.error = lightnessGauge.error;
+					vcp_lightdn_ret.error_LightIR = lightnessGauge.gauge_handle->ErrorCode;
 					vcp_lightdn_ret.lightnessIRDN = lightnessGauge.result_dn;
-//					}
-					vTurnOffLed(&led_IR);
-					HAL_Delay(100);
 					
 					//adjust W Led to lightness_target
+//				vTurnOffLed(&led_W);
+					vTurnOffLed(&led_IR);
 					AutoAdjustLed(&led_W, &lightnessGauge, lightnessW_target);
-//					if(lightnessGauge.error != 0)
-//					{
-					vcp_lightdn_ret.error = lightnessGauge.error;
-//					}
+					vcp_lightdn_ret.error_LightW = lightnessGauge.gauge_handle->ErrorCode;
 					vcp_lightdn_ret.lightnessWDN = lightnessGauge.result_dn;
-					HAL_Delay(100);
-					//re-light on IR LED again 
-					vTurnOnLed(&led_IR, led_IR.last_led_tim_val);
+					
+					vTurnOnLed(&led_W, led_W.last_led_tim_val);		//re-light on IR LED again 
+					vTurnOnLed(&led_IR, led_IR.last_led_tim_val);		//re-light on IR LED again 
+
 					CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_ret), sizeof(vcp_lightdn_ret));      //send back the detected light adc value
 					break;
 				}
+				
+				//process cmd set led lightness by timer number, and return light digital number
 				case VCP_CMD_SET_LED_TIM:
 				{
+					uint16_t vcp_ret_get_lightDN[2] = {0xffff, 0xffff};
 					uint16_t ledW_level = (uint16_t)s_RxBuff.UserRxBufferFS[1] + (((uint16_t)s_RxBuff.UserRxBufferFS[2])<<8);
 					uint16_t ledIR_level = (uint16_t)s_RxBuff.UserRxBufferFS[3] + (((uint16_t)s_RxBuff.UserRxBufferFS[4])<<8);
 					vTurnOnLed(&led_W, ledW_level);
-					vTurnOnLed(&led_W, ledIR_level);
+					vTurnOnLed(&led_IR, ledIR_level);
 					HAL_Delay(100);
 					GetLightness(&lightnessGauge);
-					CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_ret), sizeof(vcp_lightdn_ret));       //send back the detected light adc value
+					vcp_ret_get_lightDN[0] = lightnessGauge.gauge_handle->ErrorCode;
+					vcp_ret_get_lightDN[1] = lightnessGauge.result_dn;
+					CDC_Transmit_FS( (uint8_t *)(&vcp_ret_get_lightDN), sizeof(vcp_ret_get_lightDN));       //send back the detected light adc value
 					break;
 				}
+				// process cmd get led digtal number back , and return light digital number
 				case VCP_CMD_GET_LED_DN:
 				{
-					uint16_t vcp_ret_get_lightDN[2] = {0xFFFF, 0xFFFF};
+					uint16_t vcp_ret_get_lightDN[2] = {0xffff, 0xffff};
 					GetLightness(&lightnessGauge);
-					vcp_ret_get_lightDN[0] = lightnessGauge.error;
+					vcp_ret_get_lightDN[0] = lightnessGauge.gauge_handle->ErrorCode;
 					vcp_ret_get_lightDN[1] = lightnessGauge.result_dn;
 					CDC_Transmit_FS( (uint8_t *)(&vcp_ret_get_lightDN), sizeof(vcp_ret_get_lightDN));       //send back the detected light adc value
 					break;
@@ -642,6 +666,57 @@ int8_t VCP_CMD_process()
 			s_RxBuff.IsCommandDataReceived = 0;
 		}
     return 1;
+}
+
+//function to auto adjust Led to the dn_target value
+int32_t AutoAdjustLed(Timer_Led_t *ledTimer, Lightness_Gauge_t *lightGauge, uint16_t dn_target)
+{
+	if(dn_target == DN_LED_MIN || dn_target == DN_LED_MAX)
+	{
+		vTurnOnLed(ledTimer, dn_target);
+		GetLightness(lightGauge);
+		if (abs(lightGauge->result_dn - dn_target) > lightGauge->gaugeMinScale)
+		{
+			lightnessGauge.gauge_handle->ErrorCode = 0xffff;          // Led cannot be adjusted to needed value, value should be out of range.
+			lightnessGauge.result_dn = lightGauge->result_dn;
+			return -1;
+		}
+		else
+			{
+		return 0;
+		}
+	}
+	uint16_t led_low = LED_MIN, led_high = LED_MAX;
+	uint8_t times = 0;	
+	while (led_low <= led_high) 
+	{
+		times++;
+		if(times >= LIGHT_AUTOADJUST_TIME_MAX)
+		{
+			lightnessGauge.gauge_handle->ErrorCode = 0xffff;          // Led cannot be adjusted to needed value, value should be out of range.
+			return -1;
+		}	
+		uint16_t led_middle = (led_low + led_high) / 2;
+		vTurnOnLed(ledTimer, led_middle);
+		GetLightness(lightGauge);
+		if (lightGauge->gauge_handle->ErrorCode != 0)
+		{
+			return -1;
+		}
+		if (abs(lightGauge->result_dn - dn_target) <= (lightGauge->gaugeMinScale)/2)
+		{
+			return 0;
+		}
+		else if (lightGauge->result_dn > dn_target + lightGauge->gaugeMinScale) 
+		{
+			led_high = led_middle;
+		}
+		else if(lightGauge->result_dn < dn_target - lightGauge->gaugeMinScale) 
+		{
+			led_low = led_middle;
+		}
+	}
+	return -1;
 }
 
 void vTurnOnRgbLed( uint16_t r, uint16_t g, uint16_t b )
@@ -660,12 +735,12 @@ void vTurnOffRgbLed(void)
 
 uint16_t vTurnOnLed( Timer_Led_t *ledTimer, uint16_t ucLightness )
 {
-	if(ucLightness == 0x00)
+	if(ucLightness == 0x0000)
 	{
 		vTurnOffLed(ledTimer);
 		return 0;
 	}
-	ucLightness = (ucLightness > 0xFFF)?0xFFF:ucLightness;
+	ucLightness = (ucLightness > 0xfff)?0xfff:ucLightness;
 
   TIM_OC_InitTypeDef sConfigOC;             
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
@@ -679,65 +754,40 @@ uint16_t vTurnOnLed( Timer_Led_t *ledTimer, uint16_t ucLightness )
                
 	if(HAL_TIM_PWM_Start(ledTimer->tim_handle, ledTimer->tim_channel) != HAL_OK)
 	{
-		
+//		ledTimer->last_led_tim_val = 0xffff;
 	}
 	ledTimer->last_led_tim_val = ucLightness;
 	ledTimer->tim_started = 1;
 	HAL_Delay(200);
 	return 0;
 }
+
 uint16_t vTurnOffLed( Timer_Led_t *ledTimer)
-{               
+{    
+	TIM_OC_InitTypeDef sConfigOC;             
+	sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = (uint32_t)0x00000000;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  HAL_TIM_PWM_ConfigChannel(ledTimer->tim_handle, &sConfigOC, ledTimer->tim_channel);
+               
+	if(HAL_TIM_PWM_Start(ledTimer->tim_handle, ledTimer->tim_channel) != HAL_OK)
+	{
+//		ledTimer->last_led_tim_val = 0xffff;
+	}
+
 	if(HAL_TIM_PWM_Stop(ledTimer->tim_handle, ledTimer->tim_channel) != HAL_OK)
 	{
 		
 	}
+	ledTimer->last_led_tim_val = 0;
 	ledTimer->tim_started = 0;
-	return 0;
-}
 
-int32_t AutoAdjustLed(Timer_Led_t *ledTimer, Lightness_Gauge_t *lightGauge, uint16_t dn_target)
-{
-	uint16_t led_min = 0x0000, led_max = 0x0fff, led_low, led_high;
-	
-	GetLightness(lightGauge);
-	if (lightGauge->error != 0)
-	{
-		return -1;
-	}
-	if(lightGauge->result_dn < dn_target)
-	{
-		led_low = ledTimer->last_led_tim_val;
-		led_high = led_max;
-	}
-	else
-	{
-		led_low = led_min;
-		led_high = ledTimer->last_led_tim_val;
-	}
-	while (led_low <= led_high) 
-	{
-		uint16_t led_middle = (led_low + led_high) / 2;
-		vTurnOnLed(ledTimer, led_middle);
-		GetLightness(lightGauge);
-		if (lightGauge->error != 0)
-		{
-			return -1;
-		}
-		if (abs(lightGauge->result_dn - dn_target) <= lightGauge->gaugeMinScale)
-		{
-			return 0;
-		}
-		else if (lightGauge->result_dn > dn_target) 
-		{
-			led_high = led_middle-1;
-		}
-		else 
-		{
-			led_low = led_middle+1;
-		}
-	}
-	return -1;
+	HAL_Delay(200);
+	return 0;
 }
 
 /**
@@ -756,7 +806,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		}
     else
 		{
-			vTurnOnLed(&led_W, 0x0FFF);
+			vTurnOnLed(&led_W, 0x0fff);
 		}
 //		CDC_Transmit_FS( UserTxBuffer,  sizeof(UserTxBuffer) );
   }  
@@ -769,11 +819,80 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		}
     else
 		{
-			vTurnOnLed(&led_IR, 0x0FFF);
+			vTurnOnLed(&led_IR, 0x0fff);
 		}
 //		CDC_Transmit_FS( UserTxBuffer,  sizeof(UserTxBuffer) );
   } 
 }
+
+// poweron SPIVCC with the voltage defined in head file macro
+// Return value: 0 is success, 2 is failure
+int iEnableSPIVCC( int iVoltage )
+{
+	 int count;
+	 
+	 HAL_GPIO_WritePin( GPIOC, SPIVCC_200mV_Pin,  iVoltage & SPIVCC_200mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET );      // set low to enable 200mV
+	 HAL_GPIO_WritePin( GPIOC, SPIVCC_100mV_Pin,  iVoltage & SPIVCC_100mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET );      // set low to enable 100mV
+	 HAL_GPIO_WritePin( GPIOC, SPIVCC_50mV_Pin,   iVoltage & SPIVCC_50mV_Pin   ? GPIO_PIN_SET : GPIO_PIN_RESET );      // set low to enable 50mV
+	 HAL_GPIO_WritePin( GPIOC, SPIVCC_800mV_Pin,  iVoltage & SPIVCC_800mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET );      // set low to enable 800mV
+	 HAL_GPIO_WritePin( GPIOC, SPIVCC_400mV_Pin,  iVoltage & SPIVCC_400mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET );      // set low to enable 400mV
+	 HAL_GPIO_WritePin( GPIOC, SPIVCC_1600mV_Pin, iVoltage & SPIVCC_1600mV_Pin ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 1600mV
+				 
+	 HAL_GPIO_WritePin( GPIOI, SPIVCC_EN_Pin, GPIO_PIN_SET);            // enable SPIVCC
+	 
+	 count = 5000; // 2266 actual
+	 while( ( HAL_GPIO_ReadPin( SPIVCC_PG_GPIO_Port, SPIVCC_PG_Pin ) != GPIO_PIN_SET ) && ( count != 0 ) )      // PG is set?
+	 {
+				 count--;
+	 }
+	 
+	 if( count )
+	 {
+				 return 0;
+	 }
+	 else
+	 {
+				 return 2;
+	 }
+}
+
+// poweron module VCC with the voltage defined in head file macro
+// Return value: 0 is success, 1 is parameter out of range, 2 is failure
+int iEnableSENSORVCC( int iVoltage )
+{
+	 int count;
+	 
+	 if( iVoltage > SENSOR_VCC_0V90 || iVoltage < SENSOR_VCC_3V50 )     // out of range
+	 {
+				 return 1;
+	 }
+	 
+	 HAL_GPIO_WritePin( GPIOE, VCC_200mV_Pin,  iVoltage & VCC_200mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 200mV
+	 HAL_GPIO_WritePin( GPIOE, VCC_100mV_Pin,  iVoltage & VCC_100mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 100mV
+	 HAL_GPIO_WritePin( GPIOE, VCC_50mV_Pin,   iVoltage & VCC_50mV_Pin   ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 50mV
+	 HAL_GPIO_WritePin( GPIOE, VCC_800mV_Pin,  iVoltage & VCC_800mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 800mV
+	 HAL_GPIO_WritePin( GPIOE, VCC_400mV_Pin,  iVoltage & VCC_400mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 400mV
+	 HAL_GPIO_WritePin( GPIOE, VCC_1600mV_Pin, iVoltage & VCC_1600mV_Pin ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 1600mV
+				 
+	 HAL_GPIO_WritePin( GPIOI, VCC_EN_Pin, GPIO_PIN_SET);        // enable module VCC
+	 
+	 count = 5000; // 2266 actual
+	 while( HAL_GPIO_ReadPin( VCC_PG_GPIO_Port, VCC_PG_Pin ) != GPIO_PIN_SET && count != 0 )     // PG is set?
+	 {
+				 count--;
+	 }
+	 
+	 if( count )
+	 {
+				 return 0;
+	 }
+	 else
+	 {
+				 return 2;
+	 }
+}
+
+
 /* USER CODE END 4 */
 
 /**
