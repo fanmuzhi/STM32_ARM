@@ -51,75 +51,113 @@
 #include "usb_device.h"
 
 /* USER CODE BEGIN Includes */
+#pragma pack(8)
 #include "usbd_cdc.h"
 #include "usbd_cdc_if.h"
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
-ADC_HandleTypeDef hadc2;
+ADC_HandleTypeDef hadc3;
 
-RTC_HandleTypeDef hrtc;
+I2C_HandleTypeDef hi2c2;
 
 SPI_HandleTypeDef hspi1;
+SPI_HandleTypeDef hspi5;
 
-TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim10;
 TIM_HandleTypeDef htim11;
-TIM_HandleTypeDef htim13;
-
-SRAM_HandleTypeDef hsram1;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-typedef struct{
-	TIM_HandleTypeDef *tim_handle;
-	uint32_t					tim_channel;
-}led_Timer_t;
 
-led_Timer_t led_R;
-led_Timer_t led_G;
-led_Timer_t led_B;
-led_Timer_t led_W;
-led_Timer_t led_IR;
+typedef struct{	GPIO_TypeDef 		*gpio_x;
+								uint16_t				gpio_pin;
+}Gpio_RGB_Led_t;
+
+typedef struct{	TIM_HandleTypeDef		*tim_handle;
+								uint32_t						tim_channel;
+								uint16_t						tim_isStarted;
+								uint16_t						last_led_tim_val;
+}Timer_Led_t;
+
+typedef struct{	uint16_t						result_dn;
+								uint16_t						gaugeMinScale;
+								ADC_HandleTypeDef		*gauge_handle;
+}Lightness_Gauge_t;
+
+typedef struct{	uint32_t	error_LightW;
+								uint32_t	error_LightIR;
+								uint16_t	lightnessWDN;
+								uint16_t	lightnessIRDN;
+}VCP_Light_Reply_t;
+
+typedef struct{	uint32_t	error;
+								uint16_t	lightnessDN;
+}VCP_SetLed_Reply_t;
+
+Timer_Led_t led_W		= {	.tim_handle				= &htim10, 
+												.tim_channel			= TIM_CHANNEL_1, 
+												.tim_isStarted			= 0, 
+												.last_led_tim_val	= 0};
+
+Timer_Led_t led_IR	= {	.tim_handle				= &htim11, 
+												.tim_channel			= TIM_CHANNEL_1, 
+												.tim_isStarted			= 0, 
+												.last_led_tim_val	= 0 };
+
+Lightness_Gauge_t lightnessGauge		=	{	.gauge_handle		= &hadc3, 
+																				.result_dn			= 0x0000, 
+																				.gaugeMinScale	= 0x0C };
+
+VCP_Light_Reply_t vcp_lightdn_reply	=	{	.error_LightW		= 0xffffffff, 
+																				.error_LightIR	= 0xffffffff, 
+																				.lightnessWDN		= 0xffff, 
+																				.lightnessIRDN	= 0xffff };
+
+VCP_SetLed_Reply_t vcp_setLed_reply	= {	.error					= 0xffffffff, 
+																				.lightnessDN		= 0xffff };
+
+Gpio_RGB_Led_t led_R = {.gpio_x		= GPIOG, 
+												.gpio_pin	= GPIO_PIN_2};
+
+Gpio_RGB_Led_t led_G = {.gpio_x		= GPIOG, 
+												.gpio_pin	= GPIO_PIN_3};
+
+Gpio_RGB_Led_t led_B = {.gpio_x		= GPIOG, 
+												.gpio_pin	= GPIO_PIN_4};
+
 uint8_t UserTxBuffer[] = "---K1 button clicked--- \n";
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_RTC_Init(void);
+static void MX_ADC3_Init(void);
 static void MX_TIM10_Init(void);
 static void MX_TIM11_Init(void);
-static void MX_TIM13_Init(void);
-static void MX_FSMC_Init(void);
-static void MX_ADC1_Init(void);
+static void MX_I2C2_Init(void);
+static void MX_SPI5_Init(void);
 static void MX_SPI1_Init(void);
-static void MX_TIM4_Init(void);
-static void MX_ADC2_Init(void);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
-                                
-                                
                                 
                                 
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-
-//void vTurnOnLed( unsigned char ucLightness );
-void vTurnOnLed( led_Timer_t *ledTimer, unsigned char ucLightness );
-void vTurnOffLed( led_Timer_t *ledTimer);
-//void vTurnOnRedLight( unsigned char ucPulseLenth );
-//void vTurnOnGreenLight( unsigned char ucPulseLenth );
-//void vTurnOnBlueLight( unsigned char ucPulseLenth );
-//void vTurnOffRedLight(void);
-//void vTurnOffGreenLight(void);
-//void vTurnOffBlueLight(void);
+void vTurnOnRgbLed( uint16_t r, uint16_t g, uint16_t b );
+void vTurnOffRgbLed(void);
+	
+uint16_t vTurnOnLed( Timer_Led_t *ledTimer, uint16_t ucLightness );
+uint16_t vTurnOffLed( Timer_Led_t *ledTimer);
+uint16_t GetLightness( Lightness_Gauge_t *lightnessGauge );
 int8_t VCP_CMD_process( void );
+int32_t AutoAdjustLed(Timer_Led_t *ledTimer, Lightness_Gauge_t *lightGauge, uint16_t dn_target);
+
+int iEnableSPIVCC( int iVoltage );
+int iEnableSENSORVCC( int iVoltage );
 //extern uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
-
-
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -130,16 +168,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-	led_R.tim_handle = &htim10;
-	led_R.tim_channel = TIM_CHANNEL_1;
-	led_G.tim_handle = &htim11;
-	led_G.tim_channel = TIM_CHANNEL_1;
-	led_B.tim_handle = &htim13;
-	led_B.tim_channel = TIM_CHANNEL_1;
-	led_W.tim_handle = &htim4;
-	led_W.tim_channel = TIM_CHANNEL_3;
-	led_IR.tim_handle = &htim4;
-	led_IR.tim_channel = TIM_CHANNEL_4;
   /* USER CODE END 1 */
 
   /* MCU Configuration----------------------------------------------------------*/
@@ -148,79 +176,54 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
   /* USER CODE END Init */
 
   /* Configure the system clock */
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_RTC_Init();
+  MX_USB_DEVICE_Init();
+  MX_ADC3_Init();
   MX_TIM10_Init();
   MX_TIM11_Init();
-  MX_TIM13_Init();
-  MX_FSMC_Init();
-  MX_ADC1_Init();
-  MX_USB_DEVICE_Init();
+  MX_I2C2_Init();
+  MX_SPI5_Init();
   MX_SPI1_Init();
-  MX_TIM4_Init();
-  MX_ADC2_Init();
 
   /* USER CODE BEGIN 2 */
-
+	iEnableSPIVCC( SPIVCC_1V80 );
+	iEnableSENSORVCC( SENSOR_VCC_2V80 ) ;
+	HAL_Delay(10);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-	uint32_t adc1_val, adc2_val;
-	HAL_ADC_Start(&hadc1);
-	adc1_val = HAL_ADC_GetValue(&hadc1);
-	HAL_ADC_Start(&hadc2);
-	adc2_val = HAL_ADC_GetValue(&hadc2);
-	vTurnOnLed(&led_W, 100);
-	vTurnOnLed(&led_IR, 125);
-	vTurnOffLed(&led_W);
-	vTurnOffLed(&led_IR);
-	HAL_ADC_Stop(&hadc1);
-	HAL_ADC_Stop(&hadc2);
-	HAL_Delay(100);
-
   while (1)
   {
-  /* USER CODE END WHILE */
-
-  /* USER CODE BEGIN 3 */
-
-//		uint8_t *hexbuffer;
-//		uint32_t pos32;
-//		char *textbuf;
-//		int i_temp0 = 0;
-
 		VCP_CMD_process( );
-//	
-//		HAL_Delay(10);//it is better to delay a little bit time, 0.1ms up to a few ms
-//		i_temp0++;
-//		vTurnOnLed(&led_R, 255);
-//		HAL_Delay(100);
-//		vTurnOffLed(&led_R);
-//		HAL_Delay(100);
-//		//CDC_Transmit_FS( UserTxBuffer,  sizeof(UserTxBuffer) );
-
-////		uint8_t pTxData[4] = {0x11,0x22,0x33,0x44};
-////		uint8_t pRxData[4];
-//// 		HAL_SPI_TransmitReceive(&hspi1, pTxData, pRxData, 4, 2000);
+//		uint8_t pTxData[4] = {0x01,0xff,0xff,0xff};
+//		uint8_t pRxData[8];
+// 		HAL_SPI_TransmitReceive(&hspi1, pTxData, pRxData, 8, 2000);
 //	
 //		uint8_t cmd[5] = {0x11,0x22,0x33,0x44, 0xff};
 //		if(HAL_SPI_Transmit(&hspi1, cmd, 5, 1000) == HAL_OK)
 //		{
+//			
+//		}
+//		uint8_t pRxData2[5];
+//		if(HAL_SPI_Receive(&hspi1, pRxData2, 5, 1000) == HAL_OK)
+//		{
 //			HAL_Delay(100);
 //		}
-  }
+	}
+  /* USER CODE END WHILE */
+
+  /* USER CODE BEGIN 3 */
+
   /* USER CODE END 3 */
 
 }
@@ -238,19 +241,19 @@ void SystemClock_Config(void)
     */
   __HAL_RCC_PWR_CLK_ENABLE();
 
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
 
     /**Initializes the CPU, AHB and APB busses clocks 
     */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 25;
-  RCC_OscInitStruct.PLL.PLLN = 144;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 72;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 3;
+  RCC_OscInitStruct.PLL.PLLR = 2;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
@@ -270,8 +273,8 @@ void SystemClock_Config(void)
     _Error_Handler(__FILE__, __LINE__);
   }
 
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_RTC;
-  PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_CLK48;
+  PeriphClkInitStruct.Clk48ClockSelection = RCC_CLK48CLKSOURCE_PLLQ;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
@@ -289,64 +292,27 @@ void SystemClock_Config(void)
   HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
 }
 
-/* ADC1 init function */
-static void MX_ADC1_Init(void)
+/* ADC3 init function */
+static void MX_ADC3_Init(void)
 {
 
   ADC_ChannelConfTypeDef sConfig;
 
     /**Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion) 
     */
-  hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
-  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.ScanConvMode = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
-  hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-  if (HAL_ADC_Init(&hadc1) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-    /**Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time. 
-    */
-  sConfig.Channel = ADC_CHANNEL_3;
-  sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-}
-
-/* ADC2 init function */
-static void MX_ADC2_Init(void)
-{
-
-  ADC_ChannelConfTypeDef sConfig;
-
-    /**Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion) 
-    */
-  hadc2.Instance = ADC2;
-  hadc2.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
-  hadc2.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc2.Init.ScanConvMode = DISABLE;
-  hadc2.Init.ContinuousConvMode = DISABLE;
-  hadc2.Init.DiscontinuousConvMode = DISABLE;
-  hadc2.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-  hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc2.Init.NbrOfConversion = 1;
-  hadc2.Init.DMAContinuousRequests = DISABLE;
-  hadc2.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-  if (HAL_ADC_Init(&hadc2) != HAL_OK)
+  hadc3.Instance = ADC3;
+  hadc3.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc3.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc3.Init.ScanConvMode = DISABLE;
+  hadc3.Init.ContinuousConvMode = DISABLE;
+  hadc3.Init.DiscontinuousConvMode = DISABLE;
+  hadc3.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc3.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc3.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc3.Init.NbrOfConversion = 1;
+  hadc3.Init.DMAContinuousRequests = DISABLE;
+  hadc3.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc3) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
@@ -356,74 +322,27 @@ static void MX_ADC2_Init(void)
   sConfig.Channel = ADC_CHANNEL_9;
   sConfig.Rank = 1;
   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
 
 }
 
-/* RTC init function */
-static void MX_RTC_Init(void)
+/* I2C2 init function */
+static void MX_I2C2_Init(void)
 {
 
-  RTC_TimeTypeDef sTime;
-  RTC_DateTypeDef sDate;
-  RTC_AlarmTypeDef sAlarm;
-
-    /**Initialize RTC Only 
-    */
-  hrtc.Instance = RTC;
-  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
-  hrtc.Init.AsynchPrediv = 127;
-  hrtc.Init.SynchPrediv = 255;
-  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
-  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
-  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
-  if (HAL_RTC_Init(&hrtc) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-    /**Initialize RTC and set the Time and Date 
-    */
-  if(HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) != 0x32F2){
-  sTime.Hours = 0x0;
-  sTime.Minutes = 0x0;
-  sTime.Seconds = 0x0;
-  sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-  sTime.StoreOperation = RTC_STOREOPERATION_RESET;
-  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-  sDate.WeekDay = RTC_WEEKDAY_MONDAY;
-  sDate.Month = RTC_MONTH_JANUARY;
-  sDate.Date = 0x1;
-  sDate.Year = 0x0;
-
-  if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-    HAL_RTCEx_BKUPWrite(&hrtc,RTC_BKP_DR0,0x32F2);
-  }
-    /**Enable the Alarm A 
-    */
-  sAlarm.AlarmTime.Hours = 0x0;
-  sAlarm.AlarmTime.Minutes = 0x0;
-  sAlarm.AlarmTime.Seconds = 0x0;
-  sAlarm.AlarmTime.SubSeconds = 0x0;
-  sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-  sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
-  sAlarm.AlarmMask = RTC_ALARMMASK_NONE;
-  sAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;
-  sAlarm.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_DATE;
-  sAlarm.AlarmDateWeekDay = 0x1;
-  sAlarm.Alarm = RTC_ALARM_A;
-  if (HAL_RTC_SetAlarm(&hrtc, &sAlarm, RTC_FORMAT_BCD) != HAL_OK)
+  hi2c2.Instance = I2C2;
+  hi2c2.Init.ClockSpeed = 400000;
+  hi2c2.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c2.Init.OwnAddress1 = 0;
+  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c2.Init.OwnAddress2 = 0;
+  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
@@ -454,45 +373,27 @@ static void MX_SPI1_Init(void)
 
 }
 
-/* TIM4 init function */
-static void MX_TIM4_Init(void)
+/* SPI5 init function */
+static void MX_SPI5_Init(void)
 {
 
-  TIM_MasterConfigTypeDef sMasterConfig;
-  TIM_OC_InitTypeDef sConfigOC;
-
-  htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 0;
-  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 255;
-  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
+  /* SPI5 parameter configuration*/
+  hspi5.Instance = SPI5;
+  hspi5.Init.Mode = SPI_MODE_MASTER;
+  hspi5.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi5.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi5.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi5.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi5.Init.NSS = SPI_NSS_HARD_OUTPUT;
+  hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi5.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi5.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi5.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi5.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi5) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
-
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-  HAL_TIM_MspPostInit(&htim4);
 
 }
 
@@ -505,7 +406,7 @@ static void MX_TIM10_Init(void)
   htim10.Instance = TIM10;
   htim10.Init.Prescaler = 0;
   htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim10.Init.Period = 255;
+  htim10.Init.Period = 4095;
   htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
   {
@@ -518,7 +419,7 @@ static void MX_TIM10_Init(void)
   }
 
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 255;
+  sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim10, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -539,7 +440,7 @@ static void MX_TIM11_Init(void)
   htim11.Instance = TIM11;
   htim11.Init.Prescaler = 0;
   htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim11.Init.Period = 255;
+  htim11.Init.Period = 4095;
   htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim11) != HAL_OK)
   {
@@ -552,7 +453,7 @@ static void MX_TIM11_Init(void)
   }
 
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 255;
+  sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim11, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -561,40 +462,6 @@ static void MX_TIM11_Init(void)
   }
 
   HAL_TIM_MspPostInit(&htim11);
-
-}
-
-/* TIM13 init function */
-static void MX_TIM13_Init(void)
-{
-
-  TIM_OC_InitTypeDef sConfigOC;
-
-  htim13.Instance = TIM13;
-  htim13.Init.Prescaler = 0;
-  htim13.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim13.Init.Period = 255;
-  htim13.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  if (HAL_TIM_Base_Init(&htim13) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-  if (HAL_TIM_PWM_Init(&htim13) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 255;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim13, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-  HAL_TIM_MspPostInit(&htim13);
 
 }
 
@@ -611,123 +478,118 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct;
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOE_CLK_ENABLE();
+  __HAL_RCC_GPIOI_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOE_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOF, LCD_BL_Pin|LCD_RST_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOE, VCC_200mV_Pin|VCC_400mV_Pin|VCC_800mV_Pin|VCC_1600mV_Pin 
+                          |GPIO_PIN_6|VCC_50mV_Pin|VCC_100mV_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOG, CPT_IO27_Pin|CPT_IO23_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOI, VCC_EN_Pin|SPIVCC_EN_Pin|CALIBRATE_LOW_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, CPT_IO26_Pin|CPT_IO25_Pin|CPT_IO24_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, SPIVCC_200mV_Pin|SPIVCC_100mV_Pin|SPIVCC_50mV_Pin|SPIVCC_800mV_Pin 
+                          |SPIVCC_400mV_Pin|SPIVCC_1600mV_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : K2_Pin */
-  GPIO_InitStruct.Pin = K2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(K2_GPIO_Port, &GPIO_InitStruct);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : LCD_BL_Pin LCD_RST_Pin */
-  GPIO_InitStruct.Pin = LCD_BL_Pin|LCD_RST_Pin;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOG, R_Pin|G_Pin|B_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : VCC_200mV_Pin VCC_400mV_Pin VCC_800mV_Pin VCC_1600mV_Pin 
+                           PE6 VCC_50mV_Pin VCC_100mV_Pin */
+  GPIO_InitStruct.Pin = VCC_200mV_Pin|VCC_400mV_Pin|VCC_800mV_Pin|VCC_1600mV_Pin 
+                          |GPIO_PIN_6|VCC_50mV_Pin|VCC_100mV_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : K1_Pin */
-  GPIO_InitStruct.Pin = K1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  /*Configure GPIO pins : VCC_PG_Pin SPIVCC_PG_Pin */
+  GPIO_InitStruct.Pin = VCC_PG_Pin|SPIVCC_PG_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(K1_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOI, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : CPT_IO27_Pin CPT_IO23_Pin */
-  GPIO_InitStruct.Pin = CPT_IO27_Pin|CPT_IO23_Pin;
+  /*Configure GPIO pins : VCC_EN_Pin SPIVCC_EN_Pin */
+  GPIO_InitStruct.Pin = VCC_EN_Pin|SPIVCC_EN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOI, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : SPIVCC_200mV_Pin SPIVCC_100mV_Pin SPIVCC_50mV_Pin SPIVCC_800mV_Pin 
+                           SPIVCC_400mV_Pin SPIVCC_1600mV_Pin */
+  GPIO_InitStruct.Pin = SPIVCC_200mV_Pin|SPIVCC_100mV_Pin|SPIVCC_50mV_Pin|SPIVCC_800mV_Pin 
+                          |SPIVCC_400mV_Pin|SPIVCC_1600mV_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : BUZZER_Pin */
+  GPIO_InitStruct.Pin = BUZZER_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(BUZZER_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : R_Pin G_Pin B_Pin */
+  GPIO_InitStruct.Pin = R_Pin|G_Pin|B_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : CPT_IO26_Pin CPT_IO25_Pin CPT_IO24_Pin */
-  GPIO_InitStruct.Pin = CPT_IO26_Pin|CPT_IO25_Pin|CPT_IO24_Pin;
+  /*Configure GPIO pin : KEY2_Pin */
+  GPIO_InitStruct.Pin = KEY2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(KEY2_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : KEY1_Pin */
+  GPIO_InitStruct.Pin = KEY1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(KEY1_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : CALIBRATE_LOW_Pin */
+  GPIO_InitStruct.Pin = CALIBRATE_LOW_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+  HAL_GPIO_Init(CALIBRATE_LOW_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-
-}
-
-/* FSMC initialization function */
-static void MX_FSMC_Init(void)
-{
-  FSMC_NORSRAM_TimingTypeDef Timing;
-
-  /** Perform the SRAM1 memory initialization sequence
-  */
-  hsram1.Instance = FSMC_NORSRAM_DEVICE;
-  hsram1.Extended = FSMC_NORSRAM_EXTENDED_DEVICE;
-  /* hsram1.Init */
-  hsram1.Init.NSBank = FSMC_NORSRAM_BANK3;
-  hsram1.Init.DataAddressMux = FSMC_DATA_ADDRESS_MUX_DISABLE;
-  hsram1.Init.MemoryType = FSMC_MEMORY_TYPE_SRAM;
-  hsram1.Init.MemoryDataWidth = FSMC_NORSRAM_MEM_BUS_WIDTH_16;
-  hsram1.Init.BurstAccessMode = FSMC_BURST_ACCESS_MODE_DISABLE;
-  hsram1.Init.WaitSignalPolarity = FSMC_WAIT_SIGNAL_POLARITY_LOW;
-  hsram1.Init.WrapMode = FSMC_WRAP_MODE_DISABLE;
-  hsram1.Init.WaitSignalActive = FSMC_WAIT_TIMING_BEFORE_WS;
-  hsram1.Init.WriteOperation = FSMC_WRITE_OPERATION_ENABLE;
-  hsram1.Init.WaitSignal = FSMC_WAIT_SIGNAL_DISABLE;
-  hsram1.Init.ExtendedMode = FSMC_EXTENDED_MODE_DISABLE;
-  hsram1.Init.AsynchronousWait = FSMC_ASYNCHRONOUS_WAIT_DISABLE;
-  hsram1.Init.WriteBurst = FSMC_WRITE_BURST_DISABLE;
-  hsram1.Init.PageSize = FSMC_PAGE_SIZE_NONE;
-  /* Timing */
-  Timing.AddressSetupTime = 15;
-  Timing.AddressHoldTime = 15;
-  Timing.DataSetupTime = 255;
-  Timing.BusTurnAroundDuration = 15;
-  Timing.CLKDivision = 16;
-  Timing.DataLatency = 17;
-  Timing.AccessMode = FSMC_ACCESS_MODE_A;
-  /* ExtTiming */
-
-  if (HAL_SRAM_Init(&hsram1, &Timing, NULL) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 }
 
 /* USER CODE BEGIN 4 */
-uint32_t GetLightness( void )
+uint16_t GetLightness( Lightness_Gauge_t *lightnessGauge )
 {
-	uint32_t adc1_val, adc2_val;
-	
-	HAL_ADC_Start(&hadc1);
-	HAL_ADC_Start(&hadc2);
-	adc1_val = HAL_ADC_GetValue(&hadc1);
-	adc2_val = HAL_ADC_GetValue(&hadc2);
-	return adc2_val;
+	lightnessGauge->result_dn = 0xffff;
+	HAL_ADC_Start(lightnessGauge->gauge_handle);
+	HAL_ADC_PollForConversion(lightnessGauge->gauge_handle, 2000);
+	lightnessGauge->result_dn = HAL_ADC_GetValue(lightnessGauge->gauge_handle);
+	return 0;
 }		
 
+/* VCP command processing function*/
 int8_t VCP_CMD_process()
 {
-    uint32_t lightness;
-	
     if( s_RxBuff.IsCommandDataReceived == 0 )
 		{
 			return 0; //no data received
@@ -735,56 +597,181 @@ int8_t VCP_CMD_process()
     else
 		{
 			switch(s_RxBuff.UserRxBufferFS[0])
-			{ 
-				case SET_LED_WHITE:
-					vTurnOnLed(&led_R, s_RxBuff.UserRxBufferFS[1]);
-					break;
-				
-				case GET_LED_WHITE:
-						lightness = GetLightness();
-						CDC_Transmit_FS( (unsigned char*)(&lightness), sizeof(lightness) );      //send the text to PC via cdc
-					break;
-				
-				case SET_LED_IR:
-							vTurnOnLed(&led_B, s_RxBuff.UserRxBufferFS[1]);
-					break;
-				
-				case GET_LED_IR:
-						lightness = GetLightness();
-						CDC_Transmit_FS( (unsigned char*)(&lightness), sizeof(lightness) );      //send the text to PC via cdc
-					break;
-				
-				default:
+			{
+				// process cmd set led by digital number needed, and return light digital number
+				case VCP_CMD_SET_LED_DN:
+				{
+					vcp_lightdn_reply.error_LightW	= 0xffffffff, 
+					vcp_lightdn_reply.error_LightIR	= 0xffffffff, 
+					vcp_lightdn_reply.lightnessWDN	= 0xffff;
+					vcp_lightdn_reply.lightnessIRDN	= 0xffff;
+					if(s_RxBuff.UserRxBufferFS[2] >= 0x10 || s_RxBuff.UserRxBufferFS[4] >= 0x10)
+					{
+						if(s_RxBuff.UserRxBufferFS[2] >= 0x10)
+						{
+							vcp_lightdn_reply.error_LightW = DN_EXCEEDED;
+						}
+						if(s_RxBuff.UserRxBufferFS[4] >= 0x10)
+						{
+							vcp_lightdn_reply.error_LightIR = DN_EXCEEDED;
+						}
+						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
+						break;
+					}
+
+					if(s_RxBuff.UserRxBufferFS[4] >= 0x10)
+					{
+						vcp_lightdn_reply.error_LightIR = DN_EXCEEDED;
+						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
+						break;
+					}
+					uint16_t lightnessW_target = (uint16_t)s_RxBuff.UserRxBufferFS[1] + (((uint16_t)s_RxBuff.UserRxBufferFS[2])<<8);
+					uint16_t lightnessIR_target = (uint16_t)s_RxBuff.UserRxBufferFS[3] + (((uint16_t)s_RxBuff.UserRxBufferFS[4])<<8);
 					
+					//adjust IR Led to lightnessIR_target
+					vTurnOffLed(&led_W);
+//				vTurnOffLed(&led_IR);
+					if (AutoAdjustLed(&led_IR, &lightnessGauge, lightnessIR_target) == -2)
+					{
+						vcp_lightdn_reply.error_LightIR = ADJUST_TO_TARGET_FAIL;
+					}
+					else
+					{
+						vcp_lightdn_reply.error_LightIR = lightnessGauge.gauge_handle->ErrorCode;
+					}
+					vcp_lightdn_reply.lightnessIRDN = lightnessGauge.result_dn;
+					
+					//adjust W Led to lightness_target
+//				vTurnOffLed(&led_W);
+					vTurnOffLed(&led_IR);
+					if (AutoAdjustLed(&led_W, &lightnessGauge, lightnessW_target) == -2)
+					{
+						vcp_lightdn_reply.error_LightW = ADJUST_TO_TARGET_FAIL;
+					}
+					else
+					{
+						vcp_lightdn_reply.error_LightW = lightnessGauge.gauge_handle->ErrorCode;
+					}
+					vcp_lightdn_reply.lightnessWDN = lightnessGauge.result_dn;
+					vTurnOnLed(&led_W, led_W.last_led_tim_val);		//re-light on IR LED again 
+					vTurnOnLed(&led_IR, led_IR.last_led_tim_val);		//re-light on IR LED again 
+
+					CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
+					break;
+				}
+				
+				
+				case VCP_CMD_SET_LED_TIM:						//process cmd set led lightness by timer number, and return light digital number
+				{
+					if(s_RxBuff.UserRxBufferFS[2] >= 0x10 || s_RxBuff.UserRxBufferFS[4] >= 0x10)
+					{
+						vcp_setLed_reply.error = DN_EXCEEDED;
+						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
+						break;
+					}
+					vTurnOnLed(&led_W, (uint16_t)s_RxBuff.UserRxBufferFS[1] + (((uint16_t)s_RxBuff.UserRxBufferFS[2])<<8));
+					vTurnOnLed(&led_IR, (uint16_t)s_RxBuff.UserRxBufferFS[3] + (((uint16_t)s_RxBuff.UserRxBufferFS[4])<<8));
+					HAL_Delay(100);
+					GetLightness(&lightnessGauge);
+					
+					vcp_setLed_reply.error = lightnessGauge.gauge_handle->ErrorCode;
+					vcp_setLed_reply.lightnessDN = lightnessGauge.result_dn;
+					CDC_Transmit_FS( (uint8_t *)(&vcp_setLed_reply), sizeof(vcp_setLed_reply));       //send back the detected light adc value
+					break;
+				}
+				
+				
+				case VCP_CMD_GET_LED_DN:			// process cmd get led digtal number back , and return light digital number
+				{
+					GetLightness(&lightnessGauge);
+					vcp_setLed_reply.error = lightnessGauge.gauge_handle->ErrorCode;
+					vcp_setLed_reply.lightnessDN = lightnessGauge.result_dn;
+					CDC_Transmit_FS( (uint8_t *)(&vcp_setLed_reply), sizeof(vcp_setLed_reply));       //send back the detected light adc value
+					break;
+				}
+				
+				default:	
 					break;
 			}
 			s_RxBuff.IsCommandDataReceived = 0;
-			
 		}
-		
-//    //check if all data were processed.
-//    s_RxBuffers.pos_process++;
-//    if(s_RxBuffers.pos_process>=MaxCommandsInBuffer) //reach the last buffer, need to rewind to 0
-//    {
-//        s_RxBuffers.pos_process=0;
-//    }
-//    if(s_RxBuffers.pos_process==s_RxBuffers.pos_receive)s_RxBuffers.IsCommandDataReceived=0; //check if all data were processed
-//		
     return 1;
 }
 
-void vTurnOnLed( led_Timer_t *ledTimer, unsigned char ucLightness )
+//function to auto adjust Led to the dn_target value
+int32_t AutoAdjustLed(Timer_Led_t *ledTimer, Lightness_Gauge_t *lightGauge, uint16_t dn_target)
 {
-  TIM_OC_InitTypeDef sConfigOC;
-               
-	if(HAL_TIM_PWM_Stop(ledTimer->tim_handle, ledTimer->tim_channel) != HAL_OK)
+	if(dn_target == DN_LED_MIN || dn_target == DN_LED_MAX)
 	{
-		/* PWM Generation Error */
-		//Error_Handler();
+		vTurnOnLed(ledTimer, dn_target);
+		GetLightness(lightGauge);
+		if (abs(lightGauge->result_dn - dn_target) > lightGauge->gaugeMinScale)
+		{
+			return -2;
+		}
+		else
+		{
+			return 0;
+		}
 	}
-               
+	uint16_t led_low = LED_MIN, led_high = LED_MAX;
+	uint8_t count = 0;	
+	while (led_low <= led_high) 
+	{
+		count++;
+		if(count >= LIGHT_AUTOADJUST_TIME_MAX)
+		{
+			return -2;
+		}	
+		uint16_t led_middle = (led_low + led_high) / 2;
+		vTurnOnLed(ledTimer, led_middle);
+		GetLightness(lightGauge);
+		if (lightGauge->gauge_handle->ErrorCode != 0)
+		{
+			return -1;
+		}
+		if (abs(lightGauge->result_dn - dn_target) <= (lightGauge->gaugeMinScale)/2)
+		{
+			return 0;
+		}
+		else if (lightGauge->result_dn > dn_target + lightGauge->gaugeMinScale) 
+		{
+			led_high = led_middle;
+		}
+		else if(lightGauge->result_dn < dn_target - lightGauge->gaugeMinScale) 
+		{
+			led_low = led_middle;
+		}
+	}
+	return -1;
+}
+
+void vTurnOnRgbLed( uint16_t r, uint16_t g, uint16_t b )
+{
+		HAL_GPIO_WritePin(led_R.gpio_x, led_R.gpio_pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(led_G.gpio_x, led_G.gpio_pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(led_B.gpio_x, led_B.gpio_pin, GPIO_PIN_SET);
+}
+
+void vTurnOffRgbLed(void)
+{
+		HAL_GPIO_WritePin(led_R.gpio_x, led_R.gpio_pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(led_G.gpio_x, led_G.gpio_pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(led_B.gpio_x, led_B.gpio_pin, GPIO_PIN_RESET);
+}
+
+uint16_t vTurnOnLed( Timer_Led_t *ledTimer, uint16_t ucLightness )
+{
+	if(ucLightness == 0x0000)
+	{
+		vTurnOffLed(ledTimer);
+		return 0;
+	}
+	ucLightness = (ucLightness > 0xfff)?0xfff:ucLightness;
+
+  TIM_OC_InitTypeDef sConfigOC;             
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = ( uint32_t )( 255 - ucLightness );
+  sConfigOC.Pulse = (uint32_t)ucLightness;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
@@ -794,16 +781,40 @@ void vTurnOnLed( led_Timer_t *ledTimer, unsigned char ucLightness )
                
 	if(HAL_TIM_PWM_Start(ledTimer->tim_handle, ledTimer->tim_channel) != HAL_OK)
 	{
-		/* PWM Generation Error */
-		//Error_Handler();
-	}              
+//		ledTimer->last_led_tim_val = 0xffff;
+	}
+	ledTimer->last_led_tim_val = ucLightness;
+	ledTimer->tim_isStarted = 1;
+	HAL_Delay(200);
+	return 0;
 }
-void vTurnOffLed( led_Timer_t *ledTimer)
-{               
-	if(HAL_TIM_PWM_Start(ledTimer->tim_handle, ledTimer->tim_channel) == HAL_OK)
+
+uint16_t vTurnOffLed( Timer_Led_t *ledTimer)
+{    
+	TIM_OC_InitTypeDef sConfigOC;             
+	sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = (uint32_t)0x00000000;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  HAL_TIM_PWM_ConfigChannel(ledTimer->tim_handle, &sConfigOC, ledTimer->tim_channel);
+               
+	if(HAL_TIM_PWM_Start(ledTimer->tim_handle, ledTimer->tim_channel) != HAL_OK)
 	{
-		HAL_TIM_PWM_Stop(ledTimer->tim_handle, ledTimer->tim_channel);
-	}              
+//		ledTimer->last_led_tim_val = 0xffff;
+	}
+
+	if(HAL_TIM_PWM_Stop(ledTimer->tim_handle, ledTimer->tim_channel) != HAL_OK)
+	{
+		
+	}
+	ledTimer->last_led_tim_val = 0;
+	ledTimer->tim_isStarted = 0;
+
+	HAL_Delay(200);
+	return 0;
 }
 
 /**
@@ -813,13 +824,102 @@ void vTurnOffLed( led_Timer_t *ledTimer)
   */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-  if(GPIO_Pin == GPIO_PIN_0)
+  if(GPIO_Pin == GPIO_PIN_1)
   {
-    /* Toggle LED1 */
-    vTurnOffLed(&led_R);
-		CDC_Transmit_FS( UserTxBuffer,  sizeof(UserTxBuffer) );
+    /* Switch LED White */
+		if(led_W.tim_isStarted != 0)
+		{
+			vTurnOffLed(&led_W);
+		}
+    else
+		{
+			vTurnOnLed(&led_W, 0x0fff);
+		}
+//		CDC_Transmit_FS( UserTxBuffer,  sizeof(UserTxBuffer) );
   }  
+	else if(GPIO_Pin == GPIO_PIN_9)
+  {
+    /* Switch LED IR */
+		if(led_IR.tim_isStarted != 0)
+		{
+			vTurnOffLed(&led_IR);
+		}
+    else
+		{
+			vTurnOnLed(&led_IR, 0x0fff);
+		}
+//		CDC_Transmit_FS( UserTxBuffer,  sizeof(UserTxBuffer) );
+  } 
 }
+
+// poweron SPIVCC with the voltage defined in head file macro
+// Return value: 0 is success, 2 is failure
+int iEnableSPIVCC( int iVoltage )
+{
+	 int count;
+	 
+	 HAL_GPIO_WritePin( GPIOC, SPIVCC_200mV_Pin,  iVoltage & SPIVCC_200mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET );      // set low to enable 200mV
+	 HAL_GPIO_WritePin( GPIOC, SPIVCC_100mV_Pin,  iVoltage & SPIVCC_100mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET );      // set low to enable 100mV
+	 HAL_GPIO_WritePin( GPIOC, SPIVCC_50mV_Pin,   iVoltage & SPIVCC_50mV_Pin   ? GPIO_PIN_SET : GPIO_PIN_RESET );      // set low to enable 50mV
+	 HAL_GPIO_WritePin( GPIOC, SPIVCC_800mV_Pin,  iVoltage & SPIVCC_800mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET );      // set low to enable 800mV
+	 HAL_GPIO_WritePin( GPIOC, SPIVCC_400mV_Pin,  iVoltage & SPIVCC_400mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET );      // set low to enable 400mV
+	 HAL_GPIO_WritePin( GPIOC, SPIVCC_1600mV_Pin, iVoltage & SPIVCC_1600mV_Pin ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 1600mV
+				 
+	 HAL_GPIO_WritePin( GPIOI, SPIVCC_EN_Pin, GPIO_PIN_SET);            // enable SPIVCC
+	 
+	 count = 5000; // 2266 actual
+	 while( ( HAL_GPIO_ReadPin( SPIVCC_PG_GPIO_Port, SPIVCC_PG_Pin ) != GPIO_PIN_SET ) && ( count != 0 ) )      // PG is set?
+	 {
+				 count--;
+	 }
+	 
+	 if( count )
+	 {
+				 return 0;
+	 }
+	 else
+	 {
+				 return 2;
+	 }
+}
+
+// poweron module VCC with the voltage defined in head file macro
+// Return value: 0 is success, 1 is parameter out of range, 2 is failure
+int iEnableSENSORVCC( int iVoltage )
+{
+	 int count;
+	 
+	 if( iVoltage > SENSOR_VCC_0V90 || iVoltage < SENSOR_VCC_3V50 )     // out of range
+	 {
+				 return 1;
+	 }
+	 
+	 HAL_GPIO_WritePin( GPIOE, VCC_200mV_Pin,  iVoltage & VCC_200mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 200mV
+	 HAL_GPIO_WritePin( GPIOE, VCC_100mV_Pin,  iVoltage & VCC_100mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 100mV
+	 HAL_GPIO_WritePin( GPIOE, VCC_50mV_Pin,   iVoltage & VCC_50mV_Pin   ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 50mV
+	 HAL_GPIO_WritePin( GPIOE, VCC_800mV_Pin,  iVoltage & VCC_800mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 800mV
+	 HAL_GPIO_WritePin( GPIOE, VCC_400mV_Pin,  iVoltage & VCC_400mV_Pin  ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 400mV
+	 HAL_GPIO_WritePin( GPIOE, VCC_1600mV_Pin, iVoltage & VCC_1600mV_Pin ? GPIO_PIN_SET : GPIO_PIN_RESET ); // set low to enable 1600mV
+				 
+	 HAL_GPIO_WritePin( GPIOI, VCC_EN_Pin, GPIO_PIN_SET);        // enable module VCC
+	 
+	 count = 5000; // 2266 actual
+	 while( HAL_GPIO_ReadPin( VCC_PG_GPIO_Port, VCC_PG_Pin ) != GPIO_PIN_SET && count != 0 )     // PG is set?
+	 {
+				 count--;
+	 }
+	 
+	 if( count )
+	 {
+				 return 0;
+	 }
+	 else
+	 {
+				 return 2;
+	 }
+}
+
+
 /* USER CODE END 4 */
 
 /**

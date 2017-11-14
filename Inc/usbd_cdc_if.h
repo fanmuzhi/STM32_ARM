@@ -81,6 +81,7 @@
   * @{
   */  
 /* USER CODE BEGIN EXPORTED_TYPES */
+
 typedef struct s_RxBuffer
 {
     int pos_receive, pos_process; //pos_receive is the current position in buffer to save incoming data. pos_process is the index of data in buffer which has been processed.
@@ -89,7 +90,6 @@ typedef struct s_RxBuffer
     uint8_t UserRxBufferFS[2048];//it could save <MaxCommandsInBuffer> number of commands
     uint8_t CommandsLens; //save the len of each command
 } s_RxBuff_t;
-
 /* USER CODE END EXPORTED_TYPES */
 
 /**
