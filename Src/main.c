@@ -630,6 +630,7 @@ int8_t VCP_CMD_process()
 					
 					//adjust IR Led to lightnessIR_target
 					vTurnOffLed(&led_W);
+					HAL_Delay(200);
 //				vTurnOffLed(&led_IR);
 					if (AutoAdjustLed(&led_IR, &lightnessGauge, lightnessIR_target) == -2)
 					{
@@ -644,6 +645,7 @@ int8_t VCP_CMD_process()
 					//adjust W Led to lightness_target
 //				vTurnOffLed(&led_W);
 					vTurnOffLed(&led_IR);
+					HAL_Delay(200);
 					if (AutoAdjustLed(&led_W, &lightnessGauge, lightnessW_target) == -2)
 					{
 						vcp_lightdn_reply.error_LightW = ADJUST_TO_TARGET_FAIL;
@@ -704,6 +706,7 @@ int32_t AutoAdjustLed(Timer_Led_t *ledTimer, Lightness_Gauge_t *lightGauge, uint
 	if(dn_target == DN_LED_MIN || dn_target == DN_LED_MAX)
 	{
 		vTurnOnLed(ledTimer, dn_target);
+		HAL_Delay(200);
 		GetLightness(lightGauge);
 		if (abs(lightGauge->result_dn - dn_target) > lightGauge->gaugeMinScale)
 		{
@@ -725,6 +728,7 @@ int32_t AutoAdjustLed(Timer_Led_t *ledTimer, Lightness_Gauge_t *lightGauge, uint
 		}	
 		uint16_t led_middle = (led_low + led_high) / 2;
 		vTurnOnLed(ledTimer, led_middle);
+		HAL_Delay(200);
 		GetLightness(lightGauge);
 		if (lightGauge->gauge_handle->ErrorCode != 0)
 		{
@@ -785,7 +789,7 @@ uint16_t vTurnOnLed( Timer_Led_t *ledTimer, uint16_t ucLightness )
 	}
 	ledTimer->last_led_tim_val = ucLightness;
 	ledTimer->tim_isStarted = 1;
-	HAL_Delay(200);
+//	HAL_Delay(200);
 	return 0;
 }
 
@@ -812,8 +816,6 @@ uint16_t vTurnOffLed( Timer_Led_t *ledTimer)
 	}
 	ledTimer->last_led_tim_val = 0;
 	ledTimer->tim_isStarted = 0;
-
-	HAL_Delay(200);
 	return 0;
 }
 
@@ -849,7 +851,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 			vTurnOnLed(&led_IR, 0x0fff);
 		}
 //		CDC_Transmit_FS( UserTxBuffer,  sizeof(UserTxBuffer) );
-  } 
+  }
+	return;
 }
 
 // poweron SPIVCC with the voltage defined in head file macro
