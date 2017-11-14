@@ -70,58 +70,61 @@ TIM_HandleTypeDef htim11;
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
 
-typedef struct{
-								GPIO_TypeDef 		*gpio_x;
+typedef struct{	GPIO_TypeDef 		*gpio_x;
 								uint16_t				gpio_pin;
 }Gpio_RGB_Led_t;
 
-typedef struct{
-								TIM_HandleTypeDef		*tim_handle;
+typedef struct{	TIM_HandleTypeDef		*tim_handle;
 								uint32_t						tim_channel;
-								uint16_t						tim_started;
+								uint16_t						tim_isStarted;
 								uint16_t						last_led_tim_val;
 }Timer_Led_t;
 
-typedef struct{
-								uint16_t						result_dn;
+typedef struct{	uint16_t						result_dn;
 								uint16_t						gaugeMinScale;
 								ADC_HandleTypeDef		*gauge_handle;
 }Lightness_Gauge_t;
 
-typedef struct{
-								uint32_t	error_LightW;
+typedef struct{	uint32_t	error_LightW;
 								uint32_t	error_LightIR;
 								uint16_t	lightnessWDN;
 								uint16_t	lightnessIRDN;
-}VCP_Light_Return_t;
+}VCP_Light_Reply_t;
 
-Timer_Led_t led_W		= {	.tim_handle = &htim10, 
-												.tim_channel = TIM_CHANNEL_1, 
-												.tim_started = 0, 
-												.last_led_tim_val = 0};
+typedef struct{	uint32_t	error;
+								uint16_t	lightnessDN;
+}VCP_SetLed_Reply_t;
 
-Timer_Led_t led_IR	= {	.tim_handle = &htim11, 
-												.tim_channel = TIM_CHANNEL_1, 
-												.tim_started = 0, 
-												.last_led_tim_val = 0 };
+Timer_Led_t led_W		= {	.tim_handle				= &htim10, 
+												.tim_channel			= TIM_CHANNEL_1, 
+												.tim_isStarted			= 0, 
+												.last_led_tim_val	= 0};
 
-Lightness_Gauge_t lightnessGauge	=	{	.gauge_handle = &hadc3, 
-																			.result_dn = 0x0000, 
-																			.gaugeMinScale = 0x0C };
+Timer_Led_t led_IR	= {	.tim_handle				= &htim11, 
+												.tim_channel			= TIM_CHANNEL_1, 
+												.tim_isStarted			= 0, 
+												.last_led_tim_val	= 0 };
 
-VCP_Light_Return_t vcp_lightdn_ret	=	{	.error_LightW = 0xffffffff, 
-																				.error_LightIR = 0xffffffff, 
-																				.lightnessWDN = 0xffff, 
-																				.lightnessIRDN = 0xffff };
+Lightness_Gauge_t lightnessGauge		=	{	.gauge_handle		= &hadc3, 
+																				.result_dn			= 0x0000, 
+																				.gaugeMinScale	= 0x0C };
 
-Gpio_RGB_Led_t led_R = {.gpio_x = GPIOG, 
-												.gpio_pin = GPIO_PIN_2};
+VCP_Light_Reply_t vcp_lightdn_reply	=	{	.error_LightW		= 0xffffffff, 
+																				.error_LightIR	= 0xffffffff, 
+																				.lightnessWDN		= 0xffff, 
+																				.lightnessIRDN	= 0xffff };
 
-Gpio_RGB_Led_t led_G = {.gpio_x = GPIOG, 
-												.gpio_pin = GPIO_PIN_3};
+VCP_SetLed_Reply_t vcp_setLed_reply	= {	.error					= 0xffffffff, 
+																				.lightnessDN		= 0xffff };
 
-Gpio_RGB_Led_t led_B = {.gpio_x = GPIOG, 
-												.gpio_pin = GPIO_PIN_4};
+Gpio_RGB_Led_t led_R = {.gpio_x		= GPIOG, 
+												.gpio_pin	= GPIO_PIN_2};
+
+Gpio_RGB_Led_t led_G = {.gpio_x		= GPIOG, 
+												.gpio_pin	= GPIO_PIN_3};
+
+Gpio_RGB_Led_t led_B = {.gpio_x		= GPIOG, 
+												.gpio_pin	= GPIO_PIN_4};
 
 uint8_t UserTxBuffer[] = "---K1 button clicked--- \n";
 
@@ -577,12 +580,9 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 uint16_t GetLightness( Lightness_Gauge_t *lightnessGauge )
 {
-
-	lightnessGauge->gauge_handle->ErrorCode = 0xff;
 	lightnessGauge->result_dn = 0xffff;
 	HAL_ADC_Start(lightnessGauge->gauge_handle);
 	HAL_ADC_PollForConversion(lightnessGauge->gauge_handle, 2000);
-	lightnessGauge->gauge_handle->ErrorCode = lightnessGauge->gauge_handle->ErrorCode;
 	lightnessGauge->result_dn = HAL_ADC_GetValue(lightnessGauge->gauge_handle);
 	return 0;
 }		
@@ -601,13 +601,20 @@ int8_t VCP_CMD_process()
 				// process cmd set led by digital number needed, and return light digital number
 				case VCP_CMD_SET_LED_DN:
 				{
-					vcp_lightdn_ret.error_LightW	= 0xffffffff, 
-					vcp_lightdn_ret.error_LightIR	= 0xffffffff, 
-					vcp_lightdn_ret.lightnessWDN	= 0xffff;
-					vcp_lightdn_ret.lightnessIRDN	= 0xffff;
-					if(s_RxBuff.UserRxBufferFS[2] >= 0x10 || s_RxBuff.UserRxBufferFS[4] >= 0x10)
+					vcp_lightdn_reply.error_LightW	= 0xffffffff, 
+					vcp_lightdn_reply.error_LightIR	= 0xffffffff, 
+					vcp_lightdn_reply.lightnessWDN	= 0xffff;
+					vcp_lightdn_reply.lightnessIRDN	= 0xffff;
+					if(s_RxBuff.UserRxBufferFS[2] >= 0x10)
 					{
-						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_ret), sizeof(vcp_lightdn_ret));      //send back the detected light adc value
+						vcp_lightdn_reply.error_LightW = DN_EXCEEDED;
+						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
+						break;
+					}
+					if(s_RxBuff.UserRxBufferFS[4] >= 0x10)
+					{
+						vcp_lightdn_reply.error_LightIR = DN_EXCEEDED;
+						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
 						break;
 					}
 					uint16_t lightnessW_target = (uint16_t)s_RxBuff.UserRxBufferFS[1] + (((uint16_t)s_RxBuff.UserRxBufferFS[2])<<8);
@@ -616,47 +623,62 @@ int8_t VCP_CMD_process()
 					//adjust IR Led to lightnessIR_target
 					vTurnOffLed(&led_W);
 //				vTurnOffLed(&led_IR);
-					AutoAdjustLed(&led_IR, &lightnessGauge, lightnessIR_target);
-					vcp_lightdn_ret.error_LightIR = lightnessGauge.gauge_handle->ErrorCode;
-					vcp_lightdn_ret.lightnessIRDN = lightnessGauge.result_dn;
+					if (AutoAdjustLed(&led_IR, &lightnessGauge, lightnessIR_target) == -2)
+					{
+						vcp_lightdn_reply.error_LightIR = ADJUST_TO_TARGET_FAIL;
+					}
+					else
+					{
+						vcp_lightdn_reply.error_LightIR = lightnessGauge.gauge_handle->ErrorCode;
+					}
+					vcp_lightdn_reply.lightnessIRDN = lightnessGauge.result_dn;
 					
 					//adjust W Led to lightness_target
 //				vTurnOffLed(&led_W);
 					vTurnOffLed(&led_IR);
-					AutoAdjustLed(&led_W, &lightnessGauge, lightnessW_target);
-					vcp_lightdn_ret.error_LightW = lightnessGauge.gauge_handle->ErrorCode;
-					vcp_lightdn_ret.lightnessWDN = lightnessGauge.result_dn;
-					
+					if (AutoAdjustLed(&led_W, &lightnessGauge, lightnessW_target) == -2)
+					{
+						vcp_lightdn_reply.error_LightW = ADJUST_TO_TARGET_FAIL;
+					}
+					else
+					{
+						vcp_lightdn_reply.error_LightW = lightnessGauge.gauge_handle->ErrorCode;
+					}
+					vcp_lightdn_reply.lightnessWDN = lightnessGauge.result_dn;
 					vTurnOnLed(&led_W, led_W.last_led_tim_val);		//re-light on IR LED again 
 					vTurnOnLed(&led_IR, led_IR.last_led_tim_val);		//re-light on IR LED again 
 
-					CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_ret), sizeof(vcp_lightdn_ret));      //send back the detected light adc value
+					CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
 					break;
 				}
 				
-				//process cmd set led lightness by timer number, and return light digital number
-				case VCP_CMD_SET_LED_TIM:
+				
+				case VCP_CMD_SET_LED_TIM:						//process cmd set led lightness by timer number, and return light digital number
 				{
-					uint16_t vcp_ret_get_lightDN[2] = {0xffff, 0xffff};
-					uint16_t ledW_level = (uint16_t)s_RxBuff.UserRxBufferFS[1] + (((uint16_t)s_RxBuff.UserRxBufferFS[2])<<8);
-					uint16_t ledIR_level = (uint16_t)s_RxBuff.UserRxBufferFS[3] + (((uint16_t)s_RxBuff.UserRxBufferFS[4])<<8);
-					vTurnOnLed(&led_W, ledW_level);
-					vTurnOnLed(&led_IR, ledIR_level);
+					if(s_RxBuff.UserRxBufferFS[2] >= 0x10 || s_RxBuff.UserRxBufferFS[4] >= 0x10)
+					{
+						vcp_setLed_reply.error = DN_EXCEEDED;
+						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
+						break;
+					}
+					vTurnOnLed(&led_W, (uint16_t)s_RxBuff.UserRxBufferFS[1] + (((uint16_t)s_RxBuff.UserRxBufferFS[2])<<8));
+					vTurnOnLed(&led_IR, (uint16_t)s_RxBuff.UserRxBufferFS[3] + (((uint16_t)s_RxBuff.UserRxBufferFS[4])<<8));
 					HAL_Delay(100);
 					GetLightness(&lightnessGauge);
-					vcp_ret_get_lightDN[0] = lightnessGauge.gauge_handle->ErrorCode;
-					vcp_ret_get_lightDN[1] = lightnessGauge.result_dn;
-					CDC_Transmit_FS( (uint8_t *)(&vcp_ret_get_lightDN), sizeof(vcp_ret_get_lightDN));       //send back the detected light adc value
+					
+					vcp_setLed_reply.error = lightnessGauge.gauge_handle->ErrorCode;
+					vcp_setLed_reply.lightnessDN = lightnessGauge.result_dn;
+					CDC_Transmit_FS( (uint8_t *)(&vcp_setLed_reply), sizeof(vcp_setLed_reply));       //send back the detected light adc value
 					break;
 				}
-				// process cmd get led digtal number back , and return light digital number
-				case VCP_CMD_GET_LED_DN:
+				
+				
+				case VCP_CMD_GET_LED_DN:			// process cmd get led digtal number back , and return light digital number
 				{
-					uint16_t vcp_ret_get_lightDN[2] = {0xffff, 0xffff};
 					GetLightness(&lightnessGauge);
-					vcp_ret_get_lightDN[0] = lightnessGauge.gauge_handle->ErrorCode;
-					vcp_ret_get_lightDN[1] = lightnessGauge.result_dn;
-					CDC_Transmit_FS( (uint8_t *)(&vcp_ret_get_lightDN), sizeof(vcp_ret_get_lightDN));       //send back the detected light adc value
+					vcp_setLed_reply.error = lightnessGauge.gauge_handle->ErrorCode;
+					vcp_setLed_reply.lightnessDN = lightnessGauge.result_dn;
+					CDC_Transmit_FS( (uint8_t *)(&vcp_setLed_reply), sizeof(vcp_setLed_reply));       //send back the detected light adc value
 					break;
 				}
 				
@@ -677,24 +699,21 @@ int32_t AutoAdjustLed(Timer_Led_t *ledTimer, Lightness_Gauge_t *lightGauge, uint
 		GetLightness(lightGauge);
 		if (abs(lightGauge->result_dn - dn_target) > lightGauge->gaugeMinScale)
 		{
-			lightnessGauge.gauge_handle->ErrorCode = 0xffff;          // Led cannot be adjusted to needed value, value should be out of range.
-			lightnessGauge.result_dn = lightGauge->result_dn;
-			return -1;
+			return -2;
 		}
 		else
-			{
-		return 0;
+		{
+			return 0;
 		}
 	}
 	uint16_t led_low = LED_MIN, led_high = LED_MAX;
-	uint8_t times = 0;	
+	uint8_t count = 0;	
 	while (led_low <= led_high) 
 	{
-		times++;
-		if(times >= LIGHT_AUTOADJUST_TIME_MAX)
+		count++;
+		if(count >= LIGHT_AUTOADJUST_TIME_MAX)
 		{
-			lightnessGauge.gauge_handle->ErrorCode = 0xffff;          // Led cannot be adjusted to needed value, value should be out of range.
-			return -1;
+			return -2;
 		}	
 		uint16_t led_middle = (led_low + led_high) / 2;
 		vTurnOnLed(ledTimer, led_middle);
@@ -757,7 +776,7 @@ uint16_t vTurnOnLed( Timer_Led_t *ledTimer, uint16_t ucLightness )
 //		ledTimer->last_led_tim_val = 0xffff;
 	}
 	ledTimer->last_led_tim_val = ucLightness;
-	ledTimer->tim_started = 1;
+	ledTimer->tim_isStarted = 1;
 	HAL_Delay(200);
 	return 0;
 }
@@ -784,7 +803,7 @@ uint16_t vTurnOffLed( Timer_Led_t *ledTimer)
 		
 	}
 	ledTimer->last_led_tim_val = 0;
-	ledTimer->tim_started = 0;
+	ledTimer->tim_isStarted = 0;
 
 	HAL_Delay(200);
 	return 0;
@@ -800,7 +819,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   if(GPIO_Pin == GPIO_PIN_1)
   {
     /* Switch LED White */
-		if(led_W.tim_started != 0)
+		if(led_W.tim_isStarted != 0)
 		{
 			vTurnOffLed(&led_W);
 		}
@@ -813,7 +832,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	else if(GPIO_Pin == GPIO_PIN_9)
   {
     /* Switch LED IR */
-		if(led_IR.tim_started != 0)
+		if(led_IR.tim_isStarted != 0)
 		{
 			vTurnOffLed(&led_IR);
 		}
