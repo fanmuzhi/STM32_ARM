@@ -605,12 +605,20 @@ int8_t VCP_CMD_process()
 					vcp_lightdn_reply.error_LightIR	= 0xffffffff, 
 					vcp_lightdn_reply.lightnessWDN	= 0xffff;
 					vcp_lightdn_reply.lightnessIRDN	= 0xffff;
-					if(s_RxBuff.UserRxBufferFS[2] >= 0x10)
+					if(s_RxBuff.UserRxBufferFS[2] >= 0x10 || s_RxBuff.UserRxBufferFS[4] >= 0x10)
 					{
-						vcp_lightdn_reply.error_LightW = DN_EXCEEDED;
+						if(s_RxBuff.UserRxBufferFS[2] >= 0x10)
+						{
+							vcp_lightdn_reply.error_LightW = DN_EXCEEDED;
+						}
+						if(s_RxBuff.UserRxBufferFS[4] >= 0x10)
+						{
+							vcp_lightdn_reply.error_LightIR = DN_EXCEEDED;
+						}
 						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
 						break;
 					}
+
 					if(s_RxBuff.UserRxBufferFS[4] >= 0x10)
 					{
 						vcp_lightdn_reply.error_LightIR = DN_EXCEEDED;
