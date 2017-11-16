@@ -45,13 +45,14 @@
   *
   ******************************************************************************
   */
+
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f4xx_hal.h"
 #include "usb_device.h"
 
 /* USER CODE BEGIN Includes */
-#pragma pack(8)
+//#pragma pack(8)
 #include "usbd_cdc.h"
 #include "usbd_cdc_if.h"
 /* USER CODE END Includes */
@@ -69,6 +70,8 @@ TIM_HandleTypeDef htim11;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
+
+typedef enum { false, true }bool;  
 
 typedef struct{	GPIO_TypeDef 		*gpio_x;
 								uint16_t				gpio_pin;
@@ -93,7 +96,33 @@ typedef struct{	uint32_t	error_LightW;
 
 typedef struct{	uint32_t	error;
 								uint16_t	lightnessDN;
+								uint16_t	unused;
 }VCP_SetLed_Reply_t;
+
+typedef struct SensorStatus_s
+{
+	uint32_t SOFTSTATE;
+	uint32_t SOFTSTATE_EPSTATE;
+	uint32_t SOFTSTATE_FPSTATE;
+	uint32_t SOFTSTATE_SSLSTATE;
+	uint32_t EP2FLUSH;//Unused in Nassau
+	uint32_t JUSTWOKE;
+	uint32_t STATECHANGED;
+	uint32_t EP2INSIZE;//Unused in Nassau
+	uint32_t EP2INDONE;//Unused in Nassau
+	uint32_t RUNNING;
+	uint32_t EP1OUT;
+	uint32_t EP1IN;
+	uint32_t DRDY;
+	uint32_t JUSTRESET;
+	uint32_t ALIVE;
+	uint32_t EP1INSIZE;//Only used in Nassau
+	uint32_t SOFTSTATE2;//Only used in Nassau
+}Sensor_Status_t;
+
+typedef unsigned long long ep0status_t;
+
+typedef enum{ OFF_REPLYSENT, CMDWAIT, CMDPROC, REPLY };
 
 Timer_Led_t led_W		= {	.tim_handle				= &htim10, 
 												.tim_channel			= TIM_CHANNEL_1, 
@@ -115,7 +144,8 @@ VCP_Light_Reply_t vcp_lightdn_reply	=	{	.error_LightW		= 0xffffffff,
 																				.lightnessIRDN	= 0xffff };
 
 VCP_SetLed_Reply_t vcp_setLed_reply	= {	.error					= 0xffffffff, 
-																				.lightnessDN		= 0xffff };
+																				.lightnessDN		= 0xffff,
+																				.unused					= 0xffff};
 
 Gpio_RGB_Led_t led_R = {.gpio_x		= GPIOG, 
 												.gpio_pin	= GPIO_PIN_2};
@@ -157,6 +187,8 @@ int32_t AutoAdjustLed(Timer_Led_t *ledTimer, Lightness_Gauge_t *lightGauge, uint
 
 int iEnableSPIVCC( int iVoltage );
 int iEnableSENSORVCC( int iVoltage );
+
+uint32_t FpModule_getStatus(Sensor_Status_t *oSensorStatus);
 //extern uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 /* USER CODE END PFP */
 
@@ -186,18 +218,37 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USB_DEVICE_Init();
   MX_ADC3_Init();
   MX_TIM10_Init();
   MX_TIM11_Init();
   MX_I2C2_Init();
   MX_SPI5_Init();
   MX_SPI1_Init();
+  MX_USB_DEVICE_Init();
 
   /* USER CODE BEGIN 2 */
 	iEnableSPIVCC( SPIVCC_1V80 );
-	iEnableSENSORVCC( SENSOR_VCC_2V80 ) ;
+	iEnableSENSORVCC( SENSOR_VCC_3V30 ) ;
+//	deassertmcs();
 	HAL_Delay(10);
+	
+	//status check(for write cmd)
+	uint32_t rc = 0;
+//	uint32_t timeoutVal = 2000;
+	Sensor_Status_t Sensor_Status;
+//	do{
+	rc = FpModule_getStatus(&Sensor_Status);
+		
+//		if (0 != rc)
+//			return rc;
+//		timeoutVal--;
+//		if (1 == Sensor_Status.EP1OUT && OFF_REPLYSENT == Sensor_Status.SOFTSTATE_EPSTATE && 1 == Sensor_Status.DRDY)
+//		{
+//			rc = 0;
+//			break;
+//		}
+//	} while (0 != timeoutVal);
+	
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -217,7 +268,7 @@ int main(void)
 //		uint8_t pRxData2[5];
 //		if(HAL_SPI_Receive(&hspi1, pRxData2, 5, 1000) == HAL_OK)
 //		{
-//			HAL_Delay(100);
+			HAL_Delay(10);
 //		}
 	}
   /* USER CODE END WHILE */
@@ -241,7 +292,7 @@ void SystemClock_Config(void)
     */
   __HAL_RCC_PWR_CLK_ENABLE();
 
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
     /**Initializes the CPU, AHB and APB busses clocks 
     */
@@ -250,9 +301,9 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;
-  RCC_OscInitStruct.PLL.PLLN = 72;
+  RCC_OscInitStruct.PLL.PLLN = 168;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 3;
+  RCC_OscInitStruct.PLL.PLLQ = 7;
   RCC_OscInitStruct.PLL.PLLR = 2;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -265,10 +316,10 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
@@ -384,8 +435,8 @@ static void MX_SPI5_Init(void)
   hspi5.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi5.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi5.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi5.Init.NSS = SPI_NSS_HARD_OUTPUT;
-  hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi5.Init.NSS = SPI_NSS_SOFT;
+  hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
   hspi5.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi5.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi5.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -495,6 +546,9 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOI, VCC_EN_Pin|SPIVCC_EN_Pin|CALIBRATE_LOW_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(SPI5_CS_GPIO_Port, SPI5_CS_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, SPIVCC_200mV_Pin|SPIVCC_100mV_Pin|SPIVCC_50mV_Pin|SPIVCC_800mV_Pin 
                           |SPIVCC_400mV_Pin|SPIVCC_1600mV_Pin, GPIO_PIN_RESET);
 
@@ -525,6 +579,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOI, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : SPI5_CS_Pin */
+  GPIO_InitStruct.Pin = SPI5_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(SPI5_CS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : SPIVCC_200mV_Pin SPIVCC_100mV_Pin SPIVCC_50mV_Pin SPIVCC_800mV_Pin 
                            SPIVCC_400mV_Pin SPIVCC_1600mV_Pin */
@@ -609,11 +670,11 @@ int8_t VCP_CMD_process()
 					{
 						if(s_RxBuff.UserRxBufferFS[2] >= 0x10)
 						{
-							vcp_lightdn_reply.error_LightW = DN_EXCEEDED;
+							vcp_lightdn_reply.error_LightW = ERROR_SET_DN_EXCEEDED;
 						}
 						if(s_RxBuff.UserRxBufferFS[4] >= 0x10)
 						{
-							vcp_lightdn_reply.error_LightIR = DN_EXCEEDED;
+							vcp_lightdn_reply.error_LightIR = ERROR_SET_DN_EXCEEDED;
 						}
 						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
 						break;
@@ -621,7 +682,7 @@ int8_t VCP_CMD_process()
 
 					if(s_RxBuff.UserRxBufferFS[4] >= 0x10)
 					{
-						vcp_lightdn_reply.error_LightIR = DN_EXCEEDED;
+						vcp_lightdn_reply.error_LightIR = ERROR_SET_DN_EXCEEDED;
 						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
 						break;
 					}
@@ -634,7 +695,7 @@ int8_t VCP_CMD_process()
 //				vTurnOffLed(&led_IR);
 					if (AutoAdjustLed(&led_IR, &lightnessGauge, lightnessIR_target) == -2)
 					{
-						vcp_lightdn_reply.error_LightIR = ADJUST_TO_TARGET_FAIL;
+						vcp_lightdn_reply.error_LightIR = ERROR_ADJUST_TO_TARGET_FAIL;
 					}
 					else
 					{
@@ -648,7 +709,7 @@ int8_t VCP_CMD_process()
 					HAL_Delay(200);
 					if (AutoAdjustLed(&led_W, &lightnessGauge, lightnessW_target) == -2)
 					{
-						vcp_lightdn_reply.error_LightW = ADJUST_TO_TARGET_FAIL;
+						vcp_lightdn_reply.error_LightW = ERROR_ADJUST_TO_TARGET_FAIL;
 					}
 					else
 					{
@@ -667,18 +728,18 @@ int8_t VCP_CMD_process()
 				{
 					if(s_RxBuff.UserRxBufferFS[2] >= 0x10 || s_RxBuff.UserRxBufferFS[4] >= 0x10)
 					{
-						vcp_setLed_reply.error = DN_EXCEEDED;
+						vcp_setLed_reply.error = ERROR_SET_DN_EXCEEDED;
 						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
 						break;
 					}
 					vTurnOnLed(&led_W, (uint16_t)s_RxBuff.UserRxBufferFS[1] + (((uint16_t)s_RxBuff.UserRxBufferFS[2])<<8));
 					vTurnOnLed(&led_IR, (uint16_t)s_RxBuff.UserRxBufferFS[3] + (((uint16_t)s_RxBuff.UserRxBufferFS[4])<<8));
-					HAL_Delay(100);
+					HAL_Delay(200);
 					GetLightness(&lightnessGauge);
 					
 					vcp_setLed_reply.error = lightnessGauge.gauge_handle->ErrorCode;
 					vcp_setLed_reply.lightnessDN = lightnessGauge.result_dn;
-					CDC_Transmit_FS( (uint8_t *)(&vcp_setLed_reply), sizeof(vcp_setLed_reply));       //send back the detected light adc value
+					CDC_Transmit_FS( (uint8_t *)(&vcp_setLed_reply), sizeof(VCP_SetLed_Reply_t));       //send back the detected light adc value
 					break;
 				}
 				
@@ -688,7 +749,7 @@ int8_t VCP_CMD_process()
 					GetLightness(&lightnessGauge);
 					vcp_setLed_reply.error = lightnessGauge.gauge_handle->ErrorCode;
 					vcp_setLed_reply.lightnessDN = lightnessGauge.result_dn;
-					CDC_Transmit_FS( (uint8_t *)(&vcp_setLed_reply), sizeof(vcp_setLed_reply));       //send back the detected light adc value
+					CDC_Transmit_FS( (uint8_t *)(&vcp_setLed_reply), sizeof(VCP_SetLed_Reply_t));       //send back the detected light adc value
 					break;
 				}
 				
@@ -922,6 +983,90 @@ int iEnableSENSORVCC( int iVoltage )
 	 }
 }
 
+
+
+//Sensor_Status_t oSensorStatus;
+uint32_t FpModule_getStatus(Sensor_Status_t *oSensorStatus)
+{
+//		deassertmcs();
+    uint32_t status = 0;
+		ep0status_t ep0val;
+		uint32_t ep0size = EP0SIZE_BIG;
+	
+    //read from EP0IN 0x61
+    //data length to read
+		
+    uint8_t  cmdbuf[2] = { EPSELBYTE_INTEGRIFY(EPSELBYTE_EP0IN), 0/* dummy byte */ };
+		assertmcs();
+//		status = HAL_SPI_TransmitReceive(&hspi5, &(cmdbuf[0]), (uint8_t *)&ep0val, ep0size, 2000);
+		status = HAL_SPI_Transmit(&hspi5, cmdbuf, sizeof(cmdbuf), 2000);
+
+//		if (HAL_SPI_Receive(&hspi5, (uint8_t *)&ep0val, ep0size, 2000) != HAL_OK)
+//	  {
+//	    return 1;
+//	  }
+		deassertmcs();
+    if (0 == status)
+    {
+        //parse
+        oSensorStatus->SOFTSTATE = EXTRACT32(ep0val, EP0IN_SOFTSTATE, EP0IN_SOFTSTATE_B);
+        oSensorStatus->SOFTSTATE_EPSTATE = EXTRACT32(ep0val, EP0IN_SOFTSTATE_EP1STATE, EP0IN_SOFTSTATE_EP1STATE_B);
+        oSensorStatus->SOFTSTATE_FPSTATE = EXTRACT32(ep0val, EP0IN_SOFTSTATE_FPSTATE, EP0IN_SOFTSTATE_FPSTATE_B);
+        oSensorStatus->SOFTSTATE_SSLSTATE = EXTRACT32(ep0val, EP0IN_SOFTSTATE_SSLSTATE, EP0IN_SOFTSTATE_SSLSTATE_B);
+        oSensorStatus->EP2FLUSH = EXTRACT32(ep0val, EP0IN_EP2FLUSH, EP0IN_EP2FLUSH_B);
+        oSensorStatus->JUSTWOKE = EXTRACT32(ep0val, EP0IN_JUSTWOKE, EP0IN_JUSTWOKE_B);
+        oSensorStatus->STATECHANGED = EXTRACT32(ep0val, EP0IN_STATECHANGED, EP0IN_STATECHANGED_B);
+        oSensorStatus->EP2INSIZE = EXTRACT32(ep0val, EP0IN_EP2INSIZE, EP0IN_EP2INSIZE_B);
+        oSensorStatus->EP2INDONE = EXTRACT32(ep0val, EP0IN_EP2INDONE, EP0IN_EP2INDONE_B);
+        oSensorStatus->RUNNING = EXTRACT32(ep0val, EP0IN_RUNNING, EP0IN_RUNNING_B);
+        oSensorStatus->EP1OUT = EXTRACT32(ep0val, EP0IN_EP1OUT, EP0IN_EP1OUT_B);
+        oSensorStatus->EP1IN = EXTRACT32(ep0val, EP0IN_EP1IN, EP0IN_EP1IN_B);
+        oSensorStatus->DRDY = EXTRACT32(ep0val, EP0IN_DRDY, EP0IN_DRDY_B);
+        oSensorStatus->JUSTRESET = EXTRACT32(ep0val, EP0IN_JUSTRESET, EP0IN_JUSTRESET_B);
+        oSensorStatus->ALIVE = EXTRACT32(ep0val, EP0IN_ALIVE, EP0IN_ALIVE_B);
+        oSensorStatus->EP1INSIZE = EXTRACT32(ep0val, EP0IN_EP1INSIZE, EP0IN_EP1INSIZE_B);
+        oSensorStatus->SOFTSTATE2 = EXTRACT32(ep0val, EP0IN_SOFTSTATE2, EP0IN_SOFTSTATE2_B);
+    }
+
+    return status;
+}
+
+//uint32_t crc32_calc(const uint8_t *datap, unsigned int nbytes, uint32_t crc)
+//{
+//#if 1
+//    while (nbytes != 0) {
+//        crc = crc32_table[((*datap++ << 24) ^ crc) >> 24] ^ (crc << 8);
+//        nbytes--;
+//    }
+
+//    return ~crc;
+//#else
+//#define CRC32_POLY  0x04c11db7
+//    unsigned int        bitnum, highbit;
+//    uint8_t             val;
+
+//    while (nbytes != 0) {
+//        val = *datap++;
+//        bitnum = 8;
+//        while (bitnum != 0) {
+//            highbit = (crc & 0x80000000) >> 31;
+//            crc <<= 1;
+//            if ((highbit ^ ((val >> 7) & 1)) == 1) {
+//                crc ^= CRC32_POLY;
+//            }
+//            val <<= 1;
+
+//            bitnum--;
+//        }
+
+//        nbytes--;
+//    }
+
+
+//    return ~crc;
+//#endif
+
+//}
 
 /* USER CODE END 4 */
 

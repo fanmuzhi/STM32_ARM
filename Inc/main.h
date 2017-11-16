@@ -1,6 +1,6 @@
 /**
   ******************************************************************************
-  * File Name          : main.h
+  * File Name          : main.hpp
   * Description        : This file contains the common defines of the application
   ******************************************************************************
   * This notice applies to any and all portions of this file
@@ -50,8 +50,12 @@
 #define __MAIN_H
   /* Includes ------------------------------------------------------------------*/
 
+/* Includes ------------------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+//#include "vcsTypes.h"
+//#include "vcsfw_v4.h"
 
+//#pragma pack(8)
 /* USER CODE END Includes */
 
 /* Private define ------------------------------------------------------------*/
@@ -72,6 +76,8 @@
 #define VCC_EN_GPIO_Port GPIOI
 #define SPIVCC_EN_Pin GPIO_PIN_11
 #define SPIVCC_EN_GPIO_Port GPIOI
+#define SPI5_CS_Pin GPIO_PIN_6
+#define SPI5_CS_GPIO_Port GPIOF
 #define SPIVCC_200mV_Pin GPIO_PIN_0
 #define SPIVCC_200mV_GPIO_Port GPIOC
 #define SPIVCC_100mV_Pin GPIO_PIN_1
@@ -104,6 +110,13 @@
 #define VCC_100mV_GPIO_Port GPIOE
 #define CALIBRATE_LOW_Pin GPIO_PIN_7
 #define CALIBRATE_LOW_GPIO_Port GPIOI
+
+/* ########################## Assert Selection ############################## */
+/**
+  * @brief Uncomment the line below to expanse the "assert_param" macro in the 
+  *        HAL drivers code
+  */
+/* #define USE_FULL_ASSERT    1U */
 
 /* USER CODE BEGIN Private defines */
 // PC5		PC4		PC3		PC2		PC1		PC0
@@ -231,21 +244,96 @@
 #define LED_MAX 									0x0fff
 #define DN_LED_MIN 								0x0000
 #define DN_LED_MAX 								0x0fff
-//#define TARGET_LIGHT_DN_VAL				3000
+//#define TARGET_LIGHT_DN_VAL			3000
 #define TIME_LED_DELAY	 					100			//	ms, time after waiting the LED intensity stabal after light on
 #define LIGHT_AUTOADJUST_TIME_MAX	20
 
-// exception error code definitions
-#define NO_ERROR									0xF0000000
-#define SET_LED_EXCEEDED					0xF0000001
-#define DN_EXCEEDED								0xF0000002
-#define ADJUST_TO_TARGET_FAIL			0xF0000003
+#define EP0SIZE_BIG                8
+#define EPSELBYTE_INTEGRIFY(x)      \
+    (((x)& ~0xe0) | (((~(x)& 1) << 7) | ((~(x)& 2) << 5) | ((~(x)& 4) << 3)))
+#define EPSELBYTE_EP0IN     ((0 << 1) | 1)
+/*
+ * Fields in the EP0IN register.
+ */
+#define EP0IN_SOFTSTATE           0x0000001f
+#define EP0IN_SOFTSTATE_B             0
+#define EP0IN_SOFTSTATE_N             5
+#define EP0IN_SOFTSTATE_EP1STATE  0x00000003
+#define EP0IN_SOFTSTATE_EP1STATE_B    0
+#define EP0IN_SOFTSTATE_EP1STATE_N    2
+#define EP0IN_SOFTSTATE_EP1STATE_OFF        0
+#define EP0IN_SOFTSTATE_EP1STATE_REPLYSENT  0
+#define EP0IN_SOFTSTATE_EP1STATE_CMDWAIT    1
+#define EP0IN_SOFTSTATE_EP1STATE_CMDPROC    2
+#define EP0IN_SOFTSTATE_EP1STATE_REPLY      3
+#define EP0IN_SOFTSTATE_FPSTATE   0x0000000c
+#define EP0IN_SOFTSTATE_FPSTATE_B     2
+#define EP0IN_SOFTSTATE_FPSTATE_N     2
+#define EP0IN_SOFTSTATE_FPSTATE_UNKNOWN     0
+#define EP0IN_SOFTSTATE_FPSTATE_ABSENT      1
+#define EP0IN_SOFTSTATE_FPSTATE_STILL       2
+#define EP0IN_SOFTSTATE_FPSTATE_MOVING      3
+#define EP0IN_SOFTSTATE_SSLSTATE  0x00000010
+#define EP0IN_SOFTSTATE_SSLSTATE_B    4
+#define EP0IN_SOFTSTATE_SSLSTATE_N    1
+#define EP0IN_EP2FLUSH            0x00000020
+#define EP0IN_EP2FLUSH_B              5
+#define EP0IN_JUSTWOKE            0x00000040
+#define EP0IN_JUSTWOKE_B              6
+#define EP0IN_STATECHANGED        0x00000080
+#define EP0IN_STATECHANGED_B          7
+#define EP0IN_EP2INSIZE           0x01ffff00
+#define EP0IN_EP2INSIZE_B             8
+#define EP0IN_EP2INSIZE_N             17
+#define EP0IN_EP2INDONE           0x02000000
+#define EP0IN_EP2INDONE_B             25
+#define EP0IN_RUNNING             0x04000000
+#define EP0IN_RUNNING_B               26
+#define EP0IN_EP1OUT              0x08000000
+#define EP0IN_EP1OUT_B                27
+#define EP0IN_EP1IN               0x10000000
+#define EP0IN_EP1IN_B                 28
+#define EP0IN_DRDY                0x20000000
+#define EP0IN_DRDY_B                  29
+#define EP0IN_JUSTRESET           0x40000000
+#define EP0IN_JUSTRESET_B             30
+#define EP0IN_ALIVE               0x80000000
+#define EP0IN_ALIVE_B                 31
+/*
+ * The high bits of EP0IN (EP0_IN_SPI_I2C_STS_1)
+ */
+#define EP0IN_SOFTSTATE2          0xffff000000000000ULL
+#define EP0IN_SOFTSTATE2_B        48
+#define EP0IN_SOFTSTATE2_N        16
+#define EP0IN_EP1INSIZE           0x0000ffff00000000ULL
+#define EP0IN_EP1INSIZE_B         32
+#define EP0IN_EP1INSIZE_N         16
+/*
+ * Mask a 64-bit value and produce a 32-bit one.
+ */
+#define EXTRACT32(val, mask, shift)                                         \
+    (unsigned int)(((val)& (mask)) >> (shift))
 
+// exception error code definitions
+#define ERROR_NONE											0xF0000000
+#define ERROR_SET_LED_EXCEEDED					0xF0000001
+#define ERROR_SET_DN_EXCEEDED						0xF0000002
+#define ERROR_ADJUST_TO_TARGET_FAIL			0xF0000003
+
+#define assertmcs()		HAL_GPIO_WritePin(SPI5_CS_GPIO_Port, SPI5_CS_Pin, GPIO_PIN_RESET)		
+#define deassertmcs() HAL_GPIO_WritePin(SPI5_CS_GPIO_Port, SPI5_CS_Pin, GPIO_PIN_SET)
+		
 /* USER CODE END Private defines */
 
+#ifdef __cplusplus
+ extern "C" {
+#endif
 void _Error_Handler(char *, int);
 
 #define Error_Handler() _Error_Handler(__FILE__, __LINE__)
+#ifdef __cplusplus
+}
+#endif
 
 /**
   * @}
