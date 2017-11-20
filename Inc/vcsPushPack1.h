@@ -63,8 +63,8 @@
   #elif defined _CVI_
 	    #pragma pack(push,1)
   #elif defined(__arm)
-        #pragma push
-        #pragma pack(1)
+        #pragma pack(8)
+ //       #pragma pack(1)
   #endif
 #endif
 

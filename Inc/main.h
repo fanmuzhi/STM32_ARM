@@ -52,8 +52,8 @@
 
 /* Includes ------------------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-//#include "vcsTypes.h"
-//#include "vcsfw_v4.h"
+#include "vcsTypes.h"
+#include "vcsfw_v4.h"
 
 //#pragma pack(8)
 /* USER CODE END Includes */
@@ -308,20 +308,62 @@
 #define EP0IN_EP1INSIZE           0x0000ffff00000000ULL
 #define EP0IN_EP1INSIZE_B         32
 #define EP0IN_EP1INSIZE_N         16
+
+/*
+ * The end points supported on SPI interface
+ */
+#define EPSELBYTE_EP0IN     ((0 << 1) | 1)
+#define EPSELBYTE_EP1OUT    ((1 << 1) | 0)
+#define EPSELBYTE_EP1IN     ((1 << 1) | 1)
+#define EPSELBYTE_EP2IN     ((2 << 1) | 1)
+#define EPSELBYTE_EP3OUT    ((3 << 1) | 0)
+#define EPSELBYTE_RESET     0xf0
+#define EPSELBYTE_ENTERSLEEP        0xE8
+#define EPSELBYTE_EXITSLEEP         0x17
+
+#define EP0SIZE                    4
+#define EP0SIZE_BIG                8
+
+
 /*
  * Mask a 64-bit value and produce a 32-bit one.
  */
 #define EXTRACT32(val, mask, shift)                                         \
     (unsigned int)(((val)& (mask)) >> (shift))
 
+/* Given a 32-bit value, swap the bytes */
+#define ENDIANSWAP32(val)                                                   \
+    ((((val)& 0xff) << 24)                                                 \
+    | ((((val) >> 8) & 0xff) << 16)                                        \
+    | ((((val) >> 16) & 0xff) << 8)                                        \
+    | (((val) >> 24) & 0xff))
+
+/* Convert a known big-endian value to host (little) endian value */
+#define BIGTOHOST32(valp)                                                   \
+    ENDIANSWAP32(*((const uint32_t *)(valp)))
+
+/* Convert a local 32-bit value to a big endian value */
+#define HOSTTOBIG32(destp, val) (*((uint32_t *) (destp)) = ENDIANSWAP32(val))
+		
 // exception error code definitions
 #define ERROR_NONE											0xF0000000
 #define ERROR_SET_LED_EXCEEDED					0xF0000001
 #define ERROR_SET_DN_EXCEEDED						0xF0000002
 #define ERROR_ADJUST_TO_TARGET_FAIL			0xF0000003
 
-#define assertmcs()		HAL_GPIO_WritePin(SPI5_CS_GPIO_Port, SPI5_CS_Pin, GPIO_PIN_RESET)		
-#define deassertmcs() HAL_GPIO_WritePin(SPI5_CS_GPIO_Port, SPI5_CS_Pin, GPIO_PIN_SET)
+//error code
+#define ERROR_TIME_OUT					0x1500
+#define ERROR_CRC_VERIFY				0x1501
+#define ERROR_BL_MODE					0x1502
+#define ERROR_PARAM_UNDEFINE			0x1503
+#define ERROR_TYPE						0x1504
+#define ERROR_PARAMETER					0x1505
+#define ERROR_RESULT_NOTFOUND			0x1506
+#define ERROR_REPLY_LENGTH_TOO_SHORT	0x1507
+		
+		
+//#define assertmcs(Gpio_PortPin_t *mcs_pin)		HAL_GPIO_WritePin(mcs_pi, SPI5_CS_Pin, GPIO_PIN_RESET)		
+//#define deassertmcs(*Gpio_PortPin_t) HAL_GPIO_WritePin(SPI5_CS_GPIO_Port, SPI5_CS_Pin, GPIO_PIN_SET)
 		
 /* USER CODE END Private defines */
 
