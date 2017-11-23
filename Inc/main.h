@@ -240,6 +240,7 @@
 #define VCP_CMD_SET_LED_DN				0x10
 #define VCP_CMD_SET_LED_TIM				0x11
 #define VCP_CMD_GET_LED_DN 				0x20
+#define VCP_CMD_FP_GETVER					0x50
 #define LED_MIN 									0x0000
 #define LED_MAX 									0x0fff
 #define DN_LED_MIN 								0x0000
@@ -346,7 +347,7 @@
 #define HOSTTOBIG32(destp, val) (*((uint32_t *) (destp)) = ENDIANSWAP32(val))
 		
 // exception error code definitions
-#define ERROR_NONE											0xF0000000
+#define ERROR_NONE											0x00000000
 #define ERROR_SET_LED_EXCEEDED					0xF0000001
 #define ERROR_SET_DN_EXCEEDED						0xF0000002
 #define ERROR_ADJUST_TO_TARGET_FAIL			0xF0000003

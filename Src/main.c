@@ -208,7 +208,7 @@ typedef struct command_blob_s
 	uint32_t dataLength;			//data buffer size
 }command_blob_t;
 
-typedef enum{ OFF_REPLYSENT, CMDWAIT, CMDPROC, REPLY };
+typedef enum{ OFF_REPLYSENT, CMDWAIT, CMDPROC, REPLY }epstate_status;
 
 Timer_Led_t led_W		= {	.tim_handle				= &htim10, 
 												.tim_channel			= TIM_CHANNEL_1, 
@@ -248,7 +248,10 @@ Gpio_PortPin_t	mcs_spi5 ={	.gpio_x = SPI5_CS_GPIO_Port,
 
 Spi_Channel_t		spi_channel_module = {.spi_handle		= &hspi5, 
 																			.spi_mcs_gpio	= &mcs_spi5};
+Sensor_Status_t Sensor_Status;
 
+vcsfw_reply_get_version_t version;
+																			
 uint8_t UserTxBuffer[] = "---K1 button clicked--- \n";
 
 /* USER CODE END PV */
@@ -335,17 +338,9 @@ int main(void)
 	iEnableSPIVCC( SPIVCC_1V80 );
 	iEnableSENSORVCC( SENSOR_VCC_3V30 ) ;
 
-	HAL_Delay(10);
+	HAL_Delay(200);
 
-	//status check(for write cmd)
-	uint32_t rc = 0;
-//	uint32_t timeoutVal = 2000;
-	Sensor_Status_t Sensor_Status;
-//	rc = getStatus(&Sensor_Status);
-//	uint32_t rc = 0;
-
-	vcsfw_reply_get_version_t version;
-	FpGetVersion((uint8_t*)&version, sizeof(vcsfw_reply_get_version_t), 100);
+//	FpGetVersion((uint8_t*)&version, sizeof(vcsfw_reply_get_version_t), 200);
 	
   /* USER CODE END 2 */
 
@@ -355,12 +350,6 @@ int main(void)
   while (1)
   {
 		VCP_CMD_process( );
-//		uint8_t cmd[2] = {0x61, 0x00};
-//		uint8_t rpl[8];
-		//spiWriteRead(&spi_channel_module, cmd, 2, pRxData, 8, 200);
-		//spiWrite(&spi_channel_module, cmd, 2, 200);
-//		getStatus(&Sensor_Status);
-//		spiWriteRead(&spi_channel_module, cmd, 2, rpl, 8, 200);
 		HAL_Delay(5);
 	}
   /* USER CODE END WHILE */
@@ -845,6 +834,31 @@ int8_t VCP_CMD_process()
 					break;
 				}
 				
+				case VCP_CMD_FP_GETVER:
+				{
+//					uint32_t rc = 0;
+					FpGetVersion((uint8_t*)&version, sizeof(vcsfw_reply_get_version_t), 200);
+					CDC_Transmit_FS( (uint8_t *)(&version), sizeof(version)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.buildnum), sizeof(version.buildnum)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.buildtime), sizeof(version.buildtime)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.device_type), sizeof(version.device_type)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.formalrel), sizeof(version.formalrel)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.iface), sizeof(version.iface)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.otpsig), sizeof(version.otpsig)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.otpspare1), sizeof(version.otpspare1)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.patch), sizeof(version.patch)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.patchsig), sizeof(version.patchsig)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.platform), sizeof(version.platform)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.product), sizeof(version.product)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.reserved), sizeof(version.reserved)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.security), sizeof(version.security)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.serial_number), sizeof(version.serial_number)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.siliconrev), sizeof(version.siliconrev)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.target), sizeof(version.target)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.vmajor), sizeof(version.vmajor)); 
+//						CDC_Transmit_FS( (uint8_t *)(&version.vminor), sizeof(version.vminor)); 
+					
+				}
 				default:	
 					break;
 			}
@@ -1125,7 +1139,7 @@ uint32_t getStatus(Sensor_Status_t *oSensorStatus)
 		ep0status_t ep0val = 0;
 		uint32_t ep0size = EP0SIZE_BIG;
 		uint8_t  cmdbuf[2] = { EPSELBYTE_INTEGRIFY(EPSELBYTE_EP0IN), 0x00 };   /* 0 is dummy byte */
-		status = spiWriteRead(&spi_channel_module, cmdbuf, sizeof(cmdbuf), (uint8_t *)ep0val, ep0size, 200);
+		status = spiWriteRead(&spi_channel_module, cmdbuf, sizeof(cmdbuf), (uint8_t *)&ep0val, ep0size, 200);
     if (0 == status)
     {
         //parse
@@ -1168,7 +1182,7 @@ uint32_t executeCmdExt(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8
     cmd.dataLength = buflen;
 
     //get status. To see if the module if ready to execute command.
-    Sensor_Status_t Sensor_Status;
+ //   Sensor_Status_t Sensor_Status;
     do{
         rc = getStatus(&Sensor_Status);
         if (0 != rc)
@@ -1331,17 +1345,19 @@ uint32_t readCmd(uint8_t *arrRep, uint32_t size, bool crc, uint32_t timeout)
 	return rc;
 }
 
-uint32_t spiWriteRead(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint32_t cmdLen, uint8_t *rplBuf, uint32_t rplLen, uint32_t timeout)
+uint32_t spiWriteRead(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint32_t cmdLen, uint8_t *rpl, uint32_t rplLen, uint32_t timeout)
 {
+	uint32_t status = 0;
+	uint8_t rplBuf[rplLen];
 	uint8_t dummy_cmd[rplLen];
 	memset(dummy_cmd, 0x00, rplLen);
 	assert_mcs(spiChannel->spi_mcs_gpio, GPIO_PIN_RESET);
 //	HAL_Delay(10);
-	HAL_SPI_Transmit(spiChannel->spi_handle, (uint8_t *)&cmdBuf[0], cmdLen, timeout);
-	HAL_SPI_TransmitReceive(spiChannel->spi_handle, dummy_cmd, (uint8_t *)&rplBuf, rplLen, timeout);
+	status = HAL_SPI_Transmit(spiChannel->spi_handle, (uint8_t *)&cmdBuf[0], cmdLen, timeout);
+	status = HAL_SPI_TransmitReceive(spiChannel->spi_handle, dummy_cmd, (uint8_t *)&rplBuf, rplLen, timeout);
+	memcpy(rpl, rplBuf, rplLen);
 	assert_mcs(spiChannel->spi_mcs_gpio, GPIO_PIN_SET);
-	HAL_Delay(20);
-	return 0;
+	return status;
 }
 
 uint32_t spiWrite(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint32_t cmdLen, uint32_t timeout)
