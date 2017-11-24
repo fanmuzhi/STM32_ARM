@@ -88,6 +88,8 @@
 #define SPIVCC_800mV_GPIO_Port GPIOC
 #define BUZZER_Pin GPIO_PIN_4
 #define BUZZER_GPIO_Port GPIOH
+#define SPI1_CS_Pin GPIO_PIN_4
+#define SPI1_CS_GPIO_Port GPIOA
 #define SPIVCC_400mV_Pin GPIO_PIN_4
 #define SPIVCC_400mV_GPIO_Port GPIOC
 #define SPIVCC_1600mV_Pin GPIO_PIN_5
