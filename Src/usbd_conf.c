@@ -47,8 +47,8 @@
   ******************************************************************************
 */
 /* Includes ------------------------------------------------------------------*/
-#include "stm32f4xx.h"
-#include "stm32f4xx_hal.h"
+#include "stm32f7xx.h"
+#include "stm32f7xx_hal.h"
 #include "usbd_def.h"
 #include "usbd_core.h"
 
@@ -235,7 +235,7 @@ void HAL_PCD_ResumeCallback(PCD_HandleTypeDef *hpcd)
 }
 
 /**
-  * @brief  ISOC Out Incomplete callback.
+  * @brief  ISOOUTIncomplete callback.
   * @param  hpcd: PCD handle
   * @param  epnum: Endpoint Number
   * @retval None
@@ -246,7 +246,7 @@ void HAL_PCD_ISOOUTIncompleteCallback(PCD_HandleTypeDef *hpcd, uint8_t epnum)
 }
 
 /**
-  * @brief  ISOC In Incomplete callback.
+  * @brief  ISOINIncomplete callback.
   * @param  hpcd: PCD handle
   * @param  epnum: Endpoint Number
   * @retval None
@@ -257,7 +257,7 @@ void HAL_PCD_ISOINIncompleteCallback(PCD_HandleTypeDef *hpcd, uint8_t epnum)
 }
 
 /**
-  * @brief  Connect callback.
+  * @brief  ConnectCallback callback.
   * @param  hpcd: PCD handle
   * @retval None
   */
@@ -723,7 +723,6 @@ uint32_t USBD_LL_GetRxDataSize  (USBD_HandleTypeDef *pdev, uint8_t  ep_addr)
 {
   return HAL_PCD_EP_GetRxCount((PCD_HandleTypeDef*) pdev->pData, ep_addr);
 }
-
 #if (USBD_LPM_ENABLED == 1)
 /**
   * @brief  HAL_PCDEx_LPM_Callback : Send LPM message to user layer

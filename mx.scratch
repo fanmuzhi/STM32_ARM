@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Project>
-<ProjectName>D:\GitHub\STM32_ARM\\STM32F469IIT</ProjectName>
+<ProjectName>D:\GitHub\STM32_ARM\\STM32F769IGT</ProjectName>
 <CMSIS>..\Drivers\CMSIS</CMSIS>
-<HAL_Driver>C:\Users\hfan\STM32Cube\Repository\STM32Cube_FW_F4_V1.17.0\Drivers\CMSIS</HAL_Driver>
+<HAL_Driver>C:\Users\hfan\STM32Cube\Repository\STM32Cube_FW_F7_V1.8.0\Drivers\CMSIS</HAL_Driver>
 
 <Toolchain>MDK-ARM</Toolchain>
 	<Toolversion>5</Toolversion>
@@ -10,7 +10,7 @@
 
 <filestoremove>
 	<file>
-	   		<name>..\Drivers\CMSIS\Device\ST\STM32F4xx\Source\Templates\arm\startup_stm32f469xx.s</name>
+	   		<name>..\Drivers\CMSIS\Device\ST\STM32F7xx\Source\Templates\arm\startup_stm32f769xx.s</name>
 	</file>
 </filestoremove>
 
@@ -24,18 +24,18 @@
 
 <configs>
   <config>
-    <name>STM32F469IIT</name>				
-    <device>STM32F469IITx</device>		 
+    <name>STM32F769IGT</name>				
+    <device>STM32F769IGTx</device>		 
     <heapSize>0x2000</heapSize>
     <stackSize>0x4000</stackSize>
     
-    	<cpuclock>120</cpuclock>
+    	<cpuclock>144</cpuclock>
     	<board>custom</board>
 			
     <usedDebug>true</usedDebug>
     	<debugprobe>swd</debugprobe>
     <optimization></optimization>
-    <icfloc>0</icfloc>
+    <icfloc>1</icfloc>
     <Adefines>
         <define></define>
     </Adefines>   
@@ -62,11 +62,11 @@
     
 	<Cincludes>
 	   <include>..\Inc</include>
-	   <include>..\Drivers\STM32F4xx_HAL_Driver\Inc</include>
-	   <include>..\Drivers\STM32F4xx_HAL_Driver\Inc\Legacy</include>
+	   <include>..\Drivers\STM32F7xx_HAL_Driver\Inc</include>
+	   <include>..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy</include>
 	   <include>..\Middlewares\ST\STM32_USB_Device_Library\Core\Inc</include>
 	   <include>..\Middlewares\ST\STM32_USB_Device_Library\Class\CDC\Inc</include>
-	   <include>..\Drivers\CMSIS\Device\ST\STM32F4xx\Include</include>
+	   <include>..\Drivers\CMSIS\Device\ST\STM32F7xx\Include</include>
 	   <include>..\Drivers\CMSIS\Include</include>
 
     </Cincludes>
@@ -96,78 +96,75 @@
 	   <group>
 	    <name>Drivers</name> 
 		   <group>
-		 		<name>STM32F4xx_HAL_Driver</name>
+		 		<name>STM32F7xx_HAL_Driver</name>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pcd.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pcd_ex.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd_ex.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_usb.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_ll_usb.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_adc.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_adc.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_adc_ex.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_adc_ex.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_i2c.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_cortex.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_i2c_ex.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c_ex.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_tim.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_tim_ex.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc_ex.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc_ex.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash_ex.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash_ramfunc.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash_ex.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_gpio.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_gpio.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma_ex.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma_ex.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pwr.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pwr_ex.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr_ex.c</name>
 						</file>
 						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.c</name>
-						</file>
-						<file>
-							<name>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c</name>
+							<name>../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal.c</name>
 						</file>
 		    </group>
 		    <group>
 		    	<name>CMSIS</name>
 							<file>
-								<name>../Src/system_stm32f4xx.c</name>
+								<name>../Src/system_stm32f7xx.c</name>
 							</file>
 		    	</group>
 	  </group>   
@@ -196,11 +193,11 @@
                                 </file>
 
                                 <file>
-                                 <name>..\Src\stm32f4xx_it.c</name>
+                                 <name>..\Src\stm32f7xx_it.c</name>
                                 </file>
 
                                 <file>
-                                 <name>..\Src\stm32f4xx_hal_msp.c</name>
+                                 <name>..\Src\stm32f7xx_hal_msp.c</name>
                                 </file>
 
 

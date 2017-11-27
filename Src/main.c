@@ -48,7 +48,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stm32f4xx_hal.h"
+#include "stm32f7xx_hal.h"
 #include "usb_device.h"
 
 /* USER CODE BEGIN Includes */
@@ -266,11 +266,11 @@ uint8_t UserTxBuffer[] = "---K1 button clicked--- \n";
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC3_Init(void);
+static void MX_I2C2_Init(void);
 static void MX_TIM10_Init(void);
 static void MX_TIM11_Init(void);
-static void MX_I2C2_Init(void);
-static void MX_SPI5_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_SPI5_Init(void);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
                                 
@@ -290,12 +290,14 @@ int32_t AutoAdjustLed(Timer_Led_t *ledTimer, Lightness_Gauge_t *lightGauge, uint
 int iEnableSPIVCC( int iVoltage );
 int iEnableSENSORVCC( int iVoltage );
 void assert_mcs(Gpio_PortPin_t *spi_mcs_gpio, GPIO_PinState state);
-
+uint32_t FpPowerOn(uint32_t vcc, uint32_t spivcc, uint32_t timeout);
+uint32_t FpPowerOff(uint32_t timeout);
 uint32_t FpTidleSet(uint16_t idletime, uint32_t timeout);
 uint32_t FpGetVersion(uint8_t *arrVersion, uint32_t size, uint32_t timeout);
 uint32_t getStatus(Sensor_Status_t *oSensorStatus);
-uint32_t executeCmd(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t *replybufp, uint32_t replybuflen, bool crc, uint16_t *replystatus, uint32_t timeout);
-uint32_t executeCmdExt(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t *replybufp, uint32_t replybuflen, bool crc, uint16_t *replystatus, uint32_t *replySize, uint32_t timeout);
+//uint32_t executeCmd(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t *replybufp, uint32_t replybuflen, bool crc, uint16_t *replystatus, uint32_t timeout);
+uint32_t executeCmd(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t *replybufp, uint32_t replybuflen, bool crc, uint16_t *replystatus, uint32_t *replySize, uint32_t timeout);
+//uint32_t executeCmdExt(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t *replybufp, uint32_t replybuflen, bool crc, uint16_t *replystatus, uint32_t *replySize, uint32_t timeout);
 uint32_t writeCmd(command_blob_t cmd, bool crc, uint32_t timeout);
 uint32_t readCmd(uint8_t *arrRep, uint32_t size, bool crc, uint32_t timeout);
 uint32_t spiWriteRead(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint32_t cmdLen, uint8_t * rplBuf, uint32_t rplLen, uint32_t timeout);
@@ -333,18 +335,17 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_ADC3_Init();
+  MX_USB_DEVICE_Init();
+  MX_I2C2_Init();
   MX_TIM10_Init();
   MX_TIM11_Init();
-  MX_I2C2_Init();
-  MX_SPI5_Init();
   MX_SPI1_Init();
-  MX_USB_DEVICE_Init();
+  MX_SPI5_Init();
 
   /* USER CODE BEGIN 2 */
-	iEnableSPIVCC( SPIVCC_1V80 );
-	iEnableSENSORVCC( SENSOR_VCC_3V30 ) ;
 
-	HAL_Delay(200);
+	FpPowerOn( SENSOR_VCC_3V30, SPIVCC_1V80, 2000);
+	HAL_Delay(500);
 
 //	FpGetVersion((uint8_t*)&version, sizeof(vcsfw_reply_get_version_t), 200);
 
@@ -388,10 +389,9 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;
-  RCC_OscInitStruct.PLL.PLLN = 120;
+  RCC_OscInitStruct.PLL.PLLN = 144;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 5;
-  RCC_OscInitStruct.PLL.PLLR = 2;
+  RCC_OscInitStruct.PLL.PLLQ = 6;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
@@ -406,13 +406,14 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
 
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_CLK48;
-  PeriphClkInitStruct.Clk48ClockSelection = RCC_CLK48CLKSOURCE_PLLQ;
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2C2|RCC_PERIPHCLK_CLK48;
+  PeriphClkInitStruct.I2c2ClockSelection = RCC_I2C2CLKSOURCE_PCLK1;
+  PeriphClkInitStruct.Clk48ClockSelection = RCC_CLK48SOURCE_PLL;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
@@ -439,7 +440,7 @@ static void MX_ADC3_Init(void)
     /**Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion) 
     */
   hadc3.Instance = ADC3;
-  hadc3.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc3.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
   hadc3.Init.Resolution = ADC_RESOLUTION_12B;
   hadc3.Init.ScanConvMode = DISABLE;
   hadc3.Init.ContinuousConvMode = DISABLE;
@@ -472,15 +473,29 @@ static void MX_I2C2_Init(void)
 {
 
   hi2c2.Instance = I2C2;
-  hi2c2.Init.ClockSpeed = 400000;
-  hi2c2.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c2.Init.Timing = 0x00301739;
   hi2c2.Init.OwnAddress1 = 0;
   hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
   hi2c2.Init.OwnAddress2 = 0;
+  hi2c2.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
   hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
   hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
   if (HAL_I2C_Init(&hi2c2) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+    /**Configure Analogue filter 
+    */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+    /**Configure Digital filter 
+    */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c2, 0) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
@@ -503,7 +518,9 @@ static void MX_SPI1_Init(void)
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 10;
+  hspi1.Init.CRCPolynomial = 7;
+  hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi1.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
   if (HAL_SPI_Init(&hspi1) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
@@ -527,7 +544,9 @@ static void MX_SPI5_Init(void)
   hspi5.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi5.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi5.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi5.Init.CRCPolynomial = 10;
+  hspi5.Init.CRCPolynomial = 7;
+  hspi5.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi5.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
   if (HAL_SPI_Init(&hspi5) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
@@ -544,8 +563,9 @@ static void MX_TIM10_Init(void)
   htim10.Instance = TIM10;
   htim10.Init.Prescaler = 0;
   htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim10.Init.Period = 4095;
+  htim10.Init.Period = 4096;
   htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim10.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
@@ -557,7 +577,7 @@ static void MX_TIM10_Init(void)
   }
 
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 200;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim10, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -580,6 +600,7 @@ static void MX_TIM11_Init(void)
   htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim11.Init.Period = 4095;
   htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim11.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim11) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
@@ -591,7 +612,7 @@ static void MX_TIM11_Init(void)
   }
 
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 200;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim11, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -622,12 +643,14 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOG_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, VCC_200mV_Pin|VCC_400mV_Pin|VCC_800mV_Pin|VCC_1600mV_Pin 
-                          |GPIO_PIN_6|VCC_50mV_Pin|VCC_100mV_Pin, GPIO_PIN_RESET);
+                          |VCC_50mV_Pin|VCC_100mV_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_6, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOI, VCC_EN_Pin|SPIVCC_EN_Pin|CALIBRATE_LOW_Pin, GPIO_PIN_RESET);
@@ -637,21 +660,25 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, SPIVCC_200mV_Pin|SPIVCC_100mV_Pin|SPIVCC_50mV_Pin|SPIVCC_800mV_Pin 
-                          |SPIVCC_400mV_Pin|SPIVCC_1600mV_Pin, GPIO_PIN_RESET);
+                          |SPIVCC_400mV_Pin|SPIVCC_1600mV_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOH, RANGE_SEL_Pin|BUZZER_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOG, R_Pin|G_Pin|B_Pin, GPIO_PIN_RESET);
-
   /*Configure GPIO pins : VCC_200mV_Pin VCC_400mV_Pin VCC_800mV_Pin VCC_1600mV_Pin 
-                           PE6 VCC_50mV_Pin VCC_100mV_Pin */
+                           VCC_50mV_Pin VCC_100mV_Pin */
   GPIO_InitStruct.Pin = VCC_200mV_Pin|VCC_400mV_Pin|VCC_800mV_Pin|VCC_1600mV_Pin 
-                          |GPIO_PIN_6|VCC_50mV_Pin|VCC_100mV_Pin;
+                          |VCC_50mV_Pin|VCC_100mV_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PE6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -681,17 +708,17 @@ static void MX_GPIO_Init(void)
                            SPIVCC_400mV_Pin SPIVCC_1600mV_Pin */
   GPIO_InitStruct.Pin = SPIVCC_200mV_Pin|SPIVCC_100mV_Pin|SPIVCC_50mV_Pin|SPIVCC_800mV_Pin 
                           |SPIVCC_400mV_Pin|SPIVCC_1600mV_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : BUZZER_Pin */
-  GPIO_InitStruct.Pin = BUZZER_Pin;
+  /*Configure GPIO pins : RANGE_SEL_Pin BUZZER_Pin */
+  GPIO_InitStruct.Pin = RANGE_SEL_Pin|BUZZER_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(BUZZER_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOH, &GPIO_InitStruct);
 
   /*Configure GPIO pin : SPI1_CS_Pin */
   GPIO_InitStruct.Pin = SPI1_CS_Pin;
@@ -699,13 +726,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(SPI1_CS_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : R_Pin G_Pin B_Pin */
-  GPIO_InitStruct.Pin = R_Pin|G_Pin|B_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
   /*Configure GPIO pin : KEY2_Pin */
   GPIO_InitStruct.Pin = KEY2_Pin;
@@ -727,7 +747,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(CALIBRATE_LOW_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 
   HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
@@ -855,25 +875,6 @@ int8_t VCP_CMD_process()
 //					uint32_t rc = 0;
 					FpGetVersion((uint8_t*)&version, sizeof(vcsfw_reply_get_version_t), 200);
 					CDC_Transmit_FS( (uint8_t *)(&version), sizeof(version));
-//						CDC_Transmit_FS( (uint8_t *)(&version.buildnum), sizeof(version.buildnum));
-//						CDC_Transmit_FS( (uint8_t *)(&version.buildtime), sizeof(version.buildtime));
-//						CDC_Transmit_FS( (uint8_t *)(&version.device_type), sizeof(version.device_type));
-//						CDC_Transmit_FS( (uint8_t *)(&version.formalrel), sizeof(version.formalrel));
-//						CDC_Transmit_FS( (uint8_t *)(&version.iface), sizeof(version.iface));
-//						CDC_Transmit_FS( (uint8_t *)(&version.otpsig), sizeof(version.otpsig));
-//						CDC_Transmit_FS( (uint8_t *)(&version.otpspare1), sizeof(version.otpspare1));
-//						CDC_Transmit_FS( (uint8_t *)(&version.patch), sizeof(version.patch));
-//						CDC_Transmit_FS( (uint8_t *)(&version.patchsig), sizeof(version.patchsig));
-//						CDC_Transmit_FS( (uint8_t *)(&version.platform), sizeof(version.platform));
-//						CDC_Transmit_FS( (uint8_t *)(&version.product), sizeof(version.product));
-//						CDC_Transmit_FS( (uint8_t *)(&version.reserved), sizeof(version.reserved));
-//						CDC_Transmit_FS( (uint8_t *)(&version.security), sizeof(version.security));
-//						CDC_Transmit_FS( (uint8_t *)(&version.serial_number), sizeof(version.serial_number));
-//						CDC_Transmit_FS( (uint8_t *)(&version.siliconrev), sizeof(version.siliconrev));
-//						CDC_Transmit_FS( (uint8_t *)(&version.target), sizeof(version.target));
-//						CDC_Transmit_FS( (uint8_t *)(&version.vmajor), sizeof(version.vmajor));
-//						CDC_Transmit_FS( (uint8_t *)(&version.vminor), sizeof(version.vminor));
-
 				}
 				default:
 					break;
@@ -1110,6 +1111,28 @@ int iEnableSENSORVCC( int iVoltage )
 	 }
 }
 
+uint32_t FpPowerOn(uint32_t vcc, uint32_t spivcc, uint32_t timeout)
+{
+    //Logging::GetLogger()->Log("FpModule PowerOn()");
+    uint32_t rc = 0;
+
+		iEnableSPIVCC( spivcc );
+		iEnableSENSORVCC( vcc ) ;
+
+    return rc;
+}
+
+uint32_t FpPowerOff(uint32_t timeout)
+{
+    //Logging::GetLogger()->Log("FpModule PowerOff()");
+    uint32_t rc = 0;
+
+		iEnableSPIVCC( SPIVCC_0V00 );
+		iEnableSENSORVCC( SENSOR_VCC_0V00 ) ;
+
+    return rc;
+}
+
 uint32_t FpTidleSet(uint16_t idletime, uint32_t timeout)
 {
     //Logging::GetLogger()->Log("FpModule FpTidleSet() idletime=%u", idletime);
@@ -1117,12 +1140,12 @@ uint32_t FpTidleSet(uint16_t idletime, uint32_t timeout)
     uint8_t arrTidleSet[2] = { 0, 0 };//vcsfw_cmd_tidle_set_t
     memcpy(arrTidleSet, (uint8_t*)&idletime, sizeof(uint16_t));
     vcsfw_generic_reply_t ReplyStatus;
-    rc = executeCmd(VCSFW_CMD_TIDLE_SET, arrTidleSet, 2, NULL, NULL, true, &ReplyStatus.status, timeout);
+		uint32_t replysize = 0;
+    rc = executeCmd(VCSFW_CMD_TIDLE_SET, arrTidleSet, 2, NULL, NULL, true, &ReplyStatus.status, &replysize, timeout);
     if (0 != rc || 0 != ReplyStatus.status)
     {
         return 0 != rc ? rc : ReplyStatus.status;
     }
-
     return rc;
 }
 
@@ -1136,14 +1159,13 @@ uint32_t FpGetVersion(uint8_t *arrVersion, uint32_t size, uint32_t timeout)
     {
         return ERROR_PARAMETER;
     }
-
+		uint32_t replysize = 0;
     vcsfw_generic_reply_t ReplyStatus;
-    rc = executeCmd(VCSFW_CMD_GET_VERSION, NULL, NULL, arrVersion, size, true, &ReplyStatus.status, timeout);
+    rc = executeCmd(VCSFW_CMD_GET_VERSION, NULL, NULL, arrVersion, size, true, &ReplyStatus.status, &replysize, timeout);
     if (0 != rc || 0 != ReplyStatus.status)
     {
         return 0 != rc ? rc : ReplyStatus.status;
     }
-
     return rc;
 }
 
@@ -1181,15 +1203,11 @@ uint32_t getStatus(Sensor_Status_t *oSensorStatus)
     return status;
 }
 
-uint32_t executeCmd(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t *replybufp, uint32_t replybuflen, bool crc, uint16_t *replystatus, uint32_t timeout)
+uint32_t executeCmd(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t *replybufp, uint32_t replybuflen, bool crc, uint16_t *replystatus, uint32_t *replySize, uint32_t timeout)
 {
-    uint32_t replySize;
-    return executeCmdExt(cmdname, cmdbufp, buflen, replybufp, replybuflen, crc, replystatus, &replySize, timeout);
-}
-
-uint32_t executeCmdExt(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t *replybufp, uint32_t replybuflen, bool crc, uint16_t *replystatus, uint32_t *replySize, uint32_t timeout)
-{
-    uint32_t rc = 0;
+//	uint32_t replySize;
+//	return executeCmdExt(cmdname, cmdbufp, buflen, replybufp, replybuflen, crc, replystatus, &replySize, timeout);
+	uint32_t rc = 0;
     uint32_t timeoutVal = timeout;
 
     command_blob_t cmd;
@@ -1271,6 +1289,91 @@ uint32_t executeCmdExt(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8
     free(arrRead);
     return rc;
 }
+
+//uint32_t executeCmdExt(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t *replybufp, uint32_t replybuflen, bool crc, uint16_t *replystatus, uint32_t *replySize, uint32_t timeout)
+//{
+//    uint32_t rc = 0;
+//    uint32_t timeoutVal = timeout;
+
+//    command_blob_t cmd;
+//    cmd.name = cmdname;
+//    cmd.pData = cmdbufp;
+//    cmd.dataLength = buflen;
+
+//    //get status. To see if the module if ready to execute command.
+// //   Sensor_Status_t Sensor_Status;
+//    do{
+//        rc = getStatus(&Sensor_Status);
+//        if (0 != rc)
+//            return rc;
+//        timeoutVal--;
+
+//        if (1 == Sensor_Status.EP1OUT && (CMDWAIT == Sensor_Status.SOFTSTATE_EPSTATE || OFF_REPLYSENT == Sensor_Status.SOFTSTATE_EPSTATE))
+//        {
+//            rc = 0;
+//            break;
+//        }
+//    } while (0 != timeoutVal);
+
+//    if (0 == timeoutVal)
+//        return ERROR_TIME_OUT;
+
+//    //write command
+//    rc = writeCmd(cmd, crc, timeout);
+//    if (0 != rc)
+//        return rc;
+
+//    timeoutVal = timeout;
+//    do{
+//        rc = getStatus(&Sensor_Status);
+//        if (0 != rc)
+//            return rc;
+//        timeoutVal--;
+
+//        if (1 == Sensor_Status.EP1IN && REPLY == Sensor_Status.SOFTSTATE_EPSTATE && 1 == Sensor_Status.DRDY)
+//        {
+//            rc = 0;
+//            break;
+//        }
+//    } while (0 != timeoutVal);
+
+//    if (0 == timeoutVal)
+//        return ERROR_TIME_OUT;
+
+//    //read command
+//    if (0 != rc)
+//        return rc;
+
+//    uint32_t sizeRead = Sensor_Status.EP1INSIZE;
+//    uint8_t arrRead[sizeRead];
+//    memset(arrRead, 0, sizeRead);
+//    rc = readCmd(arrRead, sizeRead, crc, timeout);
+//    if (0 == rc)
+//    {
+//        if (replybuflen >= sizeRead)
+//        {
+//            //reduce status bytes
+//            *replySize = sizeRead - sizeof(uint16_t);
+//            if (replySize > 0)
+//            {
+//                memcpy(replybufp, &(arrRead[sizeof(uint16_t)]), *replySize);
+//            }
+//        }
+//        else
+//        {
+//            if (0 != replybuflen && NULL != replybufp)
+//            {
+//                memcpy(replybufp, &(arrRead[sizeof(uint16_t)]), replybuflen);
+//                *replySize = replybuflen;
+//            }
+//        }
+
+//        //copy status bytes
+//        memcpy(&replystatus, arrRead, sizeof(uint16_t));
+//    }
+//    free(arrRead);
+//    return rc;
+//}
 
 
 uint32_t writeCmd(command_blob_t cmd, bool crc, uint32_t timeout)

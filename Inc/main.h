@@ -86,6 +86,8 @@
 #define SPIVCC_50mV_GPIO_Port GPIOC
 #define SPIVCC_800mV_Pin GPIO_PIN_3
 #define SPIVCC_800mV_GPIO_Port GPIOC
+#define RANGE_SEL_Pin GPIO_PIN_3
+#define RANGE_SEL_GPIO_Port GPIOH
 #define BUZZER_Pin GPIO_PIN_4
 #define BUZZER_GPIO_Port GPIOH
 #define SPI1_CS_Pin GPIO_PIN_4
@@ -94,12 +96,6 @@
 #define SPIVCC_400mV_GPIO_Port GPIOC
 #define SPIVCC_1600mV_Pin GPIO_PIN_5
 #define SPIVCC_1600mV_GPIO_Port GPIOC
-#define R_Pin GPIO_PIN_2
-#define R_GPIO_Port GPIOG
-#define G_Pin GPIO_PIN_3
-#define G_GPIO_Port GPIOG
-#define B_Pin GPIO_PIN_4
-#define B_GPIO_Port GPIOG
 #define KEY2_Pin GPIO_PIN_9
 #define KEY2_GPIO_Port GPIOC
 #define KEY2_EXTI_IRQn EXTI9_5_IRQn
@@ -365,8 +361,8 @@
 #define ERROR_REPLY_LENGTH_TOO_SHORT	0x1507
 		
 		
-//#define assertmcs(Gpio_PortPin_t *mcs_pin)		HAL_GPIO_WritePin(mcs_pi, SPI5_CS_Pin, GPIO_PIN_RESET)		
-//#define deassertmcs(*Gpio_PortPin_t) HAL_GPIO_WritePin(SPI5_CS_GPIO_Port, SPI5_CS_Pin, GPIO_PIN_SET)
+//#define assertmcs()		HAL_GPIO_WritePin(SPI5_CS_GPIO_Port, SPI5_CS_Pin, GPIO_PIN_RESET)		
+//#define deassertmcs() HAL_GPIO_WritePin(SPI5_CS_GPIO_Port, SPI5_CS_Pin, GPIO_PIN_SET)
 		
 /* USER CODE END Private defines */
 

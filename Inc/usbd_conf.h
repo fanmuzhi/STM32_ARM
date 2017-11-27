@@ -56,8 +56,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "stm32f4xx.h"
-#include "stm32f4xx_hal.h"
+#include "stm32f7xx.h"
+#include "stm32f7xx_hal.h"
 
 /** @addtogroup USBD_OTG_DRIVER
   * @{
@@ -173,7 +173,7 @@
 }
 #endif
 
-#endif /* __USBD_CONF__H__ */
+#endif /*__USBD_CONF__H__*/
 
 /**
   * @}
