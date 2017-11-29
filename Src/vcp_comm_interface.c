@@ -1,6 +1,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include "vcp_comm_interface.h"
+
+
 #include "peripheral_devices.h"
+#include "fp_module.h"
 
 extern Timer_Led_t led_W;
 
@@ -126,13 +129,45 @@ int8_t VCP_CMD_process()
 				{
 //					uint32_t rc = 0;
 					vcsfw_reply_get_version_t version;
-					FpGetVersion((uint8_t*)&version, sizeof(vcsfw_reply_get_version_t), 200);
+					FpGetVersion((uint8_t*)&version, sizeof(vcsfw_reply_get_version_t), 2000U);
 					CDC_Transmit_FS( (uint8_t *)(&version), sizeof(version));
+					break;
 				}
+				
+				case VCP_CMD_IOTA_FIND:
+				{
+//					uint32_t rc = 0;
+					//try find only one IOTA
+					uint8_t *arrIotadata = NULL;
+					uint32_t replyLength = 0;
+					FpIotafind(arrIotadata, &replyLength, 0U, 2000);
+					CDC_Transmit_FS( (uint8_t *)(&arrIotadata), replyLength);
+					break;
+				}
+				
+				case VCP_CMD_GET_IMG:
+				{
+					uint32_t rowNumber = 88;// _dims.frame_nlines;
+					uint32_t columnNumber = 80;// _dims.line_npix;
+//					uint32_t RowNumberUsable = 88;// _dims.frame_linesusable;
+//					uint32_t ColumnNumberUsable = 00;// _dims.line_pixusable;
+					uint32_t rc = 0;
+					uint8_t *arrImage;
+					rc = FpGetImage(arrImage, rowNumber*columnNumber * 2, (uint8_t *)0, 0U, 1U, 2000);
+					if(0 == rc) 
+					{
+							CDC_Transmit_FS( (uint8_t *)(&arrImage), rowNumber*columnNumber * 2);
+					}
+
+					break;
+				}
+
 				default:
 					break;
 			}
+			
 			s_RxBuff.IsCommandDataReceived = 0;
+			
 		}
     return 1;
 }

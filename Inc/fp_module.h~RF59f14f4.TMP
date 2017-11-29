@@ -49,13 +49,13 @@ typedef struct SensorStatus_s
 	uint32_t SOFTSTATE2;//Only used in Nassau
 }Sensor_Status_t;
 
-typedef enum { MISSION_FW, IOTA, FIB }FlashReadType;
-typedef enum { BIGGEST, SHA256 }FlashReadFlags;
+typedef enum FlashReadType{ MISSION_FW, IOTA, FIB }flashRdType;
+typedef enum FlashReadFlags{ BIGGEST, SHA256 }flashRdFlags;
 //typedef enum FlashEraseType{ MISSION_FW, IOTA, MF_IOTA, FIB, SDB, ALL }flashEraseType;
 
-typedef enum  { FW_BL = 1, LNA_BL, DM, CDM, REG32BLK, REG16BLK, DIMS, ACQOPT, XSREG8BLK, STRIDEBLK, STATS, ACQCFG, ORIENTPITCH, IMGPROC_CROP, IMGPROC_DYNBPDET, IMGPROC_3X3SEPSQ, IMGPROC_DISABLE, EXTFPS_OTP_TEMPCORRECT, EXTFPS_OTP_DIEIMPRINT, EXTFPS_SIGCTRL, EXTFPS_SUNDRYREGS }FrameTagType;
+typedef enum FrameTagType { FW_BL = 1, LNA_BL, DM, CDM, REG32BLK, REG16BLK, DIMS, ACQOPT, XSREG8BLK, STRIDEBLK, STATS, ACQCFG, ORIENTPITCH, IMGPROC_CROP, IMGPROC_DYNBPDET, IMGPROC_3X3SEPSQ, IMGPROC_DISABLE, EXTFPS_OTP_TEMPCORRECT, EXTFPS_OTP_DIEIMPRINT, EXTFPS_SIGCTRL, EXTFPS_SUNDRYREGS }frameTagType;
 
-typedef enum { Baseline, Signal }WOFCalibrateType;
+typedef enum WOFCalibrateType{ Baseline, Signal }wofCalibrateType;
 
 
 //command blob for Execute FW command.
@@ -88,40 +88,18 @@ typedef struct ext_register_info_s
     (p)->value = val;   \
 }
 
-//uint32_t FpSteller_FpGetImage(uint8_t *arrImage, uint32_t size, uint8_t *arrParameter, uint32_t parameterSize, uint32_t nframes, uint32_t timeout);
-
-uint32_t FpCalibrate(uint32_t timeout);
-
-uint32_t FpFrameStateGet(FrameTagType type, uint8_t *pRespData, uint32_t *oRespSize, uint32_t nTimeout);
-
-uint32_t FpGetImage(uint8_t *arrImage, uint32_t size, uint8_t *arrParameter, uint32_t parameterSize, uint32_t nframes, uint32_t timeout);
-
-uint32_t FpIotafind(uint8_t *arrIotaData,  uint32_t *fullSize, uint32_t IotaType, uint32_t timeout);
-
 uint32_t FpIotawrite(uint8_t *arrIotadata, uint32_t size, uint16_t type, uint32_t timeout);
-
 uint32_t FpPeek(uint32_t address, uint8_t opsize, uint32_t *ovalue, uint32_t timeout);
-
 uint32_t FpPoke(uint32_t address, uint32_t value, uint8_t opsize, uint32_t timeout);
-
 uint32_t FpTestRun(uint8_t patchcmd, uint8_t *arrResponse, uint32_t size, uint32_t timeout);
-
 uint32_t FpTestRun2(uint8_t patchCmd, uint8_t *arrResponse, uint32_t size, uint32_t timeout);
-
 uint32_t FpPowerOn(uint32_t vcc, uint32_t spivcc, uint32_t timeout);
-
 uint32_t FpPowerOff(uint32_t timeout);
-
 uint32_t FpTidleSet(uint16_t idletime, uint32_t timeout);
-
 uint32_t FpGetVersion(uint8_t *arrVersion, uint32_t size, uint32_t timeout);
-
 uint32_t getStatus(Sensor_Status_t *oSensorStatus);
-
-uint32_t executeCmd(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t *replybufp, uint32_t replybuflen, bool crc, uint16_t *replystatus, uint32_t *replySize, uint32_t timeout);
-
+uint32_t executeCmd(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t *replybufp, uint32_t replybuflen, bool crc, uint16_t *replystatus, uint32_t replySize, uint32_t timeout);
 uint32_t writeCmd(command_blob_t cmd, bool crc, uint32_t timeout);
-
 uint32_t readCmd(uint8_t *arrRep, uint32_t size, bool crc, uint32_t timeout);
 
 uint32_t crc32_calc(const uint8_t *datap, unsigned int nbytes, uint32_t crc);

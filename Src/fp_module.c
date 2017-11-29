@@ -1,6 +1,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include "fp_module.h"
 
+#include "vcsTypes.h"
+#include "vcsfw_v4.h"
+
 /*
  * A table of precomputed CRC values.
  *  This table was generated using the script 'crc32.pl' that's
@@ -204,6 +207,477 @@ typedef unsigned long long ep0status_t;
 extern Spi_Channel_t spi_channel_module;
 extern Spi_Channel_t spi_channel_extend;
 
+
+// DEFINES IN FP_STELLER
+/*
+ * Endian switchers.  We assume that dactyl is running on a little-endian
+ *  machine.
+ */
+#define SENSORTOHOST8(valp)     (*((const uint8_t *) (valp)))
+#define SENSORTOHOST16(valp)    (*((const uint16_t *) (valp)))
+#define SENSORTOHOST32(valp)    (*((const uint32_t *) (valp)))
+
+#define HOSTTOSENSOR8(destp, val) (*((uint8_t *) (destp)) = (val))
+#define HOSTTOSENSOR16(destp, val) (*((uint16_t *) (destp)) = (val))
+#define HOSTTOSENSOR32(destp, val) (*((uint32_t *) (destp)) = (val))
+
+#define SENSOR_CMDWAIT  1
+#define SENSOR_REPLY	3
+
+#define IOTA_IMAGE_DATA_ALIGNMENT_STELLER      4
+#define IOTA_WRITE_DATA_SIZE_MAX_STELLER       48000
+
+#define STATUS_ACQNUM_MAX 7
+
+
+uint32_t FpCalibrate(uint32_t timeout)
+{
+    //Logging::GetLogger()->Log("FpModule FpCalibrate()");
+
+    uint32_t rc = 0;
+	vcsfw_generic_reply_t ReplyStatus = { 0 };
+	uint32_t replysize = 0;
+
+    vcsfw_cmd_frame_acq_t frame_acq;
+    frame_acq.nframes = 0;
+    frame_acq.flags = VCSFW_CMD_FRAME_ACQ_FLAGS_CAL_BL;
+    rc = executeCmd(VCSFW_CMD_FRAME_ACQ, (uint8_t*)&frame_acq, sizeof(vcsfw_cmd_frame_acq_t), NULL, 0, true, &ReplyStatus.status, &replysize, timeout);
+    if (0 != rc || 0 != ReplyStatus.status)
+    {
+        return 0 != rc ? rc : ReplyStatus.status;
+    }
+
+    return rc;
+}
+
+/*
+    FpFrameStateGet
+    
+    Parameters : 
+        type        [in]   - FrameTagType
+        pRespData   [out]  - response data
+        oRespSize   [out]  - response data size
+        nTimeout    [in]   - time out period
+*/
+uint32_t FpFrameStateGet(FrameTagType type, uint8_t *pRespData, uint32_t *oRespSize, uint32_t nTimeout)
+{
+    //Logging::GetLogger()->Log("FpModule FpFrameStateGet()");
+
+    uint32_t        rc = 0;
+    //unsigned int    nFlags = 0x00;
+    unsigned int    nFullSize = NULL;
+    unsigned int    nReplySize = NULL;
+
+    vcsfw_reply_frame_state_get_t   frameReply;
+    vcsfw_cmd_frame_state_get_t     frameStateCmd;
+    vcsfw_generic_reply_t           genReply;
+	uint32_t						replysize = 0;
+
+    //check params
+    if (NULL == pRespData)
+    {
+        return ERROR_PARAMETER;
+    }
+
+    memset(&frameStateCmd, 0, sizeof(frameStateCmd));
+    frameStateCmd.tag = (uint8_t)type;
+
+    /*
+     * get the full length of the frame tag.
+     */
+    rc = executeCmd(VCSFW_CMD_FRAME_STATE_GET, (uint8_t*)&frameStateCmd, sizeof(frameStateCmd), (uint8_t*)&frameReply, sizeof(frameReply), true, &genReply.status, &replysize, nTimeout);
+    if (0 != rc || 0 != genReply.status)
+    {
+        return 0 != rc ? rc : genReply.status;
+    }
+
+    /*
+     * Now we have the full state length.  Allocate a buffer
+     *  for it and also a buffer to hold the command reply to fetch
+     *  it (possibly in pieces).
+     */
+    nFullSize = frameReply.fullsize;
+    if (0 == nFullSize)
+    {
+        return ERROR_REPLY_LENGTH_TOO_SHORT;
+    }
+
+    /*
+     * Now repeatedly issue the command to get whole data of the frame tag
+     */
+    memset(&frameStateCmd, 0, sizeof(frameStateCmd));
+    frameStateCmd.flags = VCSFW_CMD_FRAME_STATE_GET_FLAG_READMAX;
+    frameStateCmd.tag = (uint8_t)type;
+
+    /*  
+     * ReplySize = sizeof(vcsfw_reply_frame_state_get_t) + sizeof(vcsfw_frame_tag_t) + sizeof(data) + sizeof(vcsfw_frame_tag_t) + sizeof(data) .....
+     * 
+     */
+    nReplySize = nFullSize + sizeof(frameReply);
+    uint8_t pReplyBuf[nReplySize];
+    rc = executeCmd(VCSFW_CMD_FRAME_STATE_GET, (uint8_t*)&frameStateCmd, sizeof(frameStateCmd), pReplyBuf, nReplySize, true, &genReply.status, &replysize, nTimeout);
+    if (0 != rc || 0 != genReply.status)
+    {
+				free(pReplyBuf);
+        return ((rc) ? (rc) : (genReply.status));
+    }
+
+    memcpy(&frameReply, pReplyBuf, sizeof(vcsfw_cmd_frame_state_get_t));
+    if (nFullSize > frameReply.fullsize) //should equal
+    {
+        return ERROR_REPLY_LENGTH_TOO_SHORT;
+    }
+
+    for (uint32_t i = 0; i < frameReply.fullsize; )
+    {
+        //parse frametag here
+        vcsfw_frame_tag_t frameTag;
+        memcpy(&frameTag, &pReplyBuf[i + sizeof(vcsfw_cmd_frame_state_get_t)], sizeof(vcsfw_frame_tag_t));
+        uint32_t frameTagSize = frameTag.nwords * 4;   // convert word to bytes
+
+        //find the tag in full return
+        if (frameTag.tagid == (uint8_t)type)
+        {
+            memcpy(pRespData, &pReplyBuf[i + sizeof(vcsfw_cmd_frame_state_get_t)+ sizeof(vcsfw_frame_tag_t)], frameTagSize);
+            *oRespSize = frameTagSize;
+            //TODO: how to save multiple frame tags
+        }
+        i += frameTagSize + sizeof(vcsfw_frame_tag_t);
+    }
+		free(pReplyBuf);
+    return rc;
+}
+
+
+uint32_t FpGetImage(uint8_t *arrImage, uint32_t size, uint8_t *arrParameter, uint32_t parameterSize, uint32_t nframes, uint32_t timeout)
+{
+    //Logging::GetLogger()->Log("FpModule FpGetImage()");
+
+    uint32_t rc = 0;
+		vcsfw_generic_reply_t ReplyStatus = { 0 };
+		uint32_t replysize = 0;
+
+    //check params
+    if (NULL == arrImage)
+    {
+        return ERROR_PARAMETER;
+    }
+
+    //frame acq
+    vcsfw_cmd_frame_acq_t frame_acq;
+    frame_acq.nframes = 1;//frames
+    frame_acq.flags = 0;
+
+		uint8_t *arrFrameAcq = NULL;
+		if (NULL == arrParameter || 0 == parameterSize)
+		{
+			uint8_t arrFrameAcq[sizeof(vcsfw_cmd_frame_acq_t)];
+			memcpy(arrFrameAcq, &frame_acq, sizeof(vcsfw_cmd_frame_acq_t));
+		}
+		else
+		{
+			uint8_t arrFrameAcq[parameterSize + sizeof(vcsfw_cmd_frame_acq_t)];
+			memcpy(arrFrameAcq, &frame_acq, sizeof(vcsfw_cmd_frame_acq_t));
+			memcpy(&(arrFrameAcq[sizeof(vcsfw_cmd_frame_acq_t)]), arrParameter, parameterSize);
+		}
+
+		rc = executeCmd(VCSFW_CMD_FRAME_ACQ, arrFrameAcq, sizeof(vcsfw_cmd_frame_acq_t)+parameterSize, NULL, 0, true, &ReplyStatus.status, &replysize, timeout);
+		free(arrFrameAcq);
+    if (0 != rc || 0 != ReplyStatus.status)
+    {
+        return 0 != rc ? rc : ReplyStatus.status;
+    }
+
+    /*
+        This is from Matt:
+        There must be some other reason DRDY is asserted before the frame is ready.  
+        Can you check the acqnum before issuing the FRAME_READ?  
+        The FRAME_ACQ command should set acqnum to 0, and when a frame is available, acqnum will be 1.
+     */
+    uint32_t timeoutVal = timeout;
+    Sensor_Status_t Sensor_Status;
+    do{
+        rc = getStatus(&Sensor_Status);
+        if (0 != rc)
+            return rc;
+        timeoutVal--;
+        if (0 != (Sensor_Status.SOFTSTATE2&0x7))
+        {
+            rc = 0;
+            break;
+        }
+    } while (0 != timeoutVal);
+    if (0 == timeoutVal)
+        return ERROR_TIME_OUT;
+
+    //test to read frame only
+    //frame read
+    vcsfw_cmd_frame_read_t frame_read;
+    frame_read.nbytes = 0xFFFF;
+    frame_read.xfernum = 0;
+    frame_read.flags = 0;
+    frame_read.offset = 0;
+    unsigned int replybuflen = size + sizeof(vcsfw_reply_frame_read_t);
+    uint8_t *replybufp = (uint8_t *) malloc(replybuflen);
+		
+    rc = executeCmd(VCSFW_CMD_FRAME_READ, (uint8_t*)&frame_read, sizeof(vcsfw_reply_frame_read_t), replybufp, replybuflen, true, &ReplyStatus.status, &replysize, timeout);
+    
+		if (0 != rc || 0 != ReplyStatus.status)
+    {
+				free(replybufp);
+        return 0 != rc ? rc : ReplyStatus.status;
+    }
+
+    vcsfw_reply_frame_read_t reply_frame_read;
+    memcpy(&reply_frame_read, &(replybufp[0]), sizeof(vcsfw_reply_frame_read_t));
+
+    memcpy(arrImage, &(replybufp[sizeof(vcsfw_reply_frame_read_t)]), size);
+		free(replybufp);
+		
+
+    //frame finish
+    rc = executeCmd(VCSFW_CMD_FRAME_FINISH, NULL, 0, NULL, 0, true, &ReplyStatus.status, &replysize, timeout);
+    if (0 != rc || 0 != ReplyStatus.status)
+    {
+        return 0 != rc ? rc : ReplyStatus.status;
+    }
+
+    return rc;
+}
+
+/*
+	FpIotafind, to execute the IOTA find command.
+    
+    Parameters : 
+		arrIotaData [out]  - Pointer to the data array, exclude the vcsfw_reply_iota_find_t
+        fullSize    [out]  - response data size
+        IotaType    [in]   - IOTA_ITYPE, 0 = search all 
+        timeout     [in]   - time out period
+*/
+uint32_t FpIotafind(uint8_t *arrIotaData,  uint32_t *fullSize, uint32_t IotaType, uint32_t timeout)
+{
+    uint32_t rc = 0;
+		vcsfw_generic_reply_t ReplyStatus = { 0 };
+		uint32_t replysize = 0;
+
+    vcsfw_cmd_iota_find_t iota_find;
+    iota_find.itype = IotaType;
+    iota_find.flags = VCSFW_CMD_IOTA_FIND_FLAGS_READMAX;
+    iota_find.maxniotas = 0;
+    iota_find.firstidx = 0;
+    iota_find.dummy[0] = 0;
+    iota_find.dummy[1] = 0;
+    iota_find.offset = 0;
+    iota_find.nbytes = 0;
+
+	if (IotaType == 0)	//find all IOTA
+	{
+		iota_find.flags |= VCSFW_CMD_IOTA_FIND_FLAGS_ALLIOTAS;
+	}
+
+	//execute VCSFW_CMD_IOTA_FIND to find full size the iota.
+	vcsfw_reply_iota_find_t iota_find_reply_length;
+	rc = executeCmd(VCSFW_CMD_IOTA_FIND, (uint8_t*)&iota_find, sizeof(vcsfw_cmd_iota_find_t), (uint8_t*)&iota_find_reply_length, sizeof(vcsfw_reply_iota_find_t), true, &ReplyStatus.status, &replysize, timeout);
+	if (0 != rc || 0 != ReplyStatus.status)
+	{
+		return 0 != rc ? rc : ReplyStatus.status;
+	}
+	*fullSize = iota_find_reply_length.fullsize;
+
+	//realloc the receive buffer size if needed.
+	//if parameter arrIotaData is not NULL, may have memory leakage issue.
+	//uint8_t arrIotaData[fullSize];
+//	uint8_t *arrIotaData = (uint8_t *)malloc(*fullSize);
+	uint32_t offset = 0;
+	//int32_t stateleft = fullSize - sizeof(vcsfw_reply_iota_find_t);    //include header : vcsfw_reply_iota_find_t
+	int32_t stateleft = *fullSize;
+
+	while (stateleft > 0)
+	{
+		iota_find.offset = offset;
+
+		uint32_t sizeRead = 0;
+		sizeRead = *fullSize;	//try to read max
+		uint8_t arrRead[sizeRead];
+		memset(arrRead, 0, sizeRead);
+
+		uint32_t replySize = 0;	//actual reply size, exclude status 2 bytes
+		rc = executeCmd(VCSFW_CMD_IOTA_FIND, (uint8_t*)&iota_find, sizeof(vcsfw_cmd_iota_find_t), arrRead, sizeRead, true, &ReplyStatus.status, &replySize, timeout);
+
+		if (0 == rc)
+		{
+			uint32_t piecelen = 0;
+			piecelen = replySize - sizeof(vcsfw_reply_iota_find_t);//minus status and reply_iota_find
+
+			//copy data except the vcsfw_reply_iota_find_t header
+			memcpy(&(arrIotaData[offset]), &(arrRead[sizeof(vcsfw_reply_iota_find_t)]), piecelen);
+
+			offset += piecelen;
+			stateleft -= piecelen;
+		}
+		free(arrRead);
+
+		if (0 != rc || 0 != ReplyStatus.status)
+			return 0 != rc ? rc : ReplyStatus.status;
+	}
+
+    return rc;
+}
+
+uint32_t FpIotawrite(uint8_t *arrIotadata, uint32_t size, uint16_t type, uint32_t timeout)
+{
+    uint32_t rc = 0;
+	vcsfw_generic_reply_t ReplyStatus = { 0 };
+	uint32_t replysize = 0;
+
+    //check params
+    if (NULL == arrIotadata||0 == size)
+    {
+        return ERROR_PARAMETER;
+    }
+
+    if (0 == type)
+    {
+        rc = executeCmd(VCSFW_CMD_IOTA_WRITE, arrIotadata, size, NULL, 0, true, &ReplyStatus.status, &replysize, timeout);
+    }
+    else
+    {
+        vcsfw_cmd_iota_write_t cmd_iota_write;
+        memset(&cmd_iota_write, 0, sizeof(vcsfw_cmd_iota_write_t));
+        cmd_iota_write.itype = type;
+        uint8_t arrData[size + sizeof(vcsfw_cmd_iota_write_t)];
+        memcpy(arrData, &cmd_iota_write, sizeof(vcsfw_cmd_iota_write_t));
+        memcpy(&(arrData[sizeof(vcsfw_cmd_iota_write_t)]), arrIotadata, size);
+        rc = executeCmd(VCSFW_CMD_IOTA_WRITE, arrData, size + sizeof(vcsfw_cmd_iota_write_t), NULL, 0, true, &ReplyStatus.status, &replysize, timeout);
+        free(arrData);
+    }
+
+    if (0 != rc || 0 != ReplyStatus.status)
+    {
+        rc = (0 != rc) ? rc : ReplyStatus.status;
+    }
+
+//#if defined(_INTERNAL_BUILD) || defined(_DEBUG)
+//    // Get Time info
+//	time_t rawtime;
+//	struct tm * timeinfo;
+//	wchar_t buffer[80];
+//	time(&rawtime);
+//	timeinfo = localtime(&rawtime);
+//	wcsftime(buffer, 80, L"%y-%m-%d-%H-%M-%S", timeinfo);
+//	wstring ws(buffer);
+//	string logtime(ws.begin(), ws.end());
+//	
+//	// Get Error Code
+//	char strBuf[100];
+//	string strRetStatus("");
+//	if (0 != rc)
+//	{
+//		sprintf(strBuf, "_WriteFail_0x%X_", ReplyStatus.status);
+//		strRetStatus = strBuf;
+//	}
+//
+//	// Get IOTA Type
+//	sprintf(strBuf, "0x%X", type);
+//	string strIotaType = strBuf;
+//
+//	// Write IOTA Dump
+//	string 	strFileName("IOTA_Type_" + strIotaType + "_" + logtime + strRetStatus + ".bin");
+//	FILE*		fileDump = NULL;
+//	if (fopen_s(&fileDump, strFileName.c_str(), "wb") == NULL)
+//	{
+//		fwrite(arrIotadata, sizeof(vcsUint8_t), size, fileDump);
+//		fclose(fileDump);
+//	}
+//#endif
+
+    return rc;
+}
+
+uint32_t FpPeek(uint32_t address, uint8_t opsize, uint32_t *ovalue, uint32_t timeout)
+{
+    uint32_t rc = 0;
+		vcsfw_generic_reply_t ReplyStatus = { 0 };
+		uint32_t replysize = 0;
+
+    vcsfw_cmd_peek_t cmd_peek;
+    cmd_peek.address = address;
+    cmd_peek.opsize = opsize;
+
+    rc = executeCmd(VCSFW_CMD_PEEK, (uint8_t*)&cmd_peek, sizeof(vcsfw_cmd_peek_t), (uint8_t*)&ovalue, sizeof(uint32_t), true, &ReplyStatus.status, &replysize, timeout);
+    if (0 != rc || 0 != ReplyStatus.status)
+    {
+        return 0 != rc ? rc : ReplyStatus.status;
+    }
+
+    return rc;
+}
+
+uint32_t FpPoke(uint32_t address, uint32_t value, uint8_t opsize, uint32_t timeout)
+{
+    uint32_t rc = 0;
+		vcsfw_generic_reply_t ReplyStatus = { 0 };
+		uint32_t replysize = 0;
+    vcsfw_cmd_poke_t cmd_poke;
+    cmd_poke.address = address;
+    cmd_poke.value = value;
+    cmd_poke.opsize = opsize;
+
+    rc = executeCmd(VCSFW_CMD_POKE, (uint8_t*)&cmd_poke, sizeof(vcsfw_cmd_poke_t), NULL, 0, true, &ReplyStatus.status, &replysize, timeout);
+    if (0 != rc || 0 != ReplyStatus.status)
+    {
+        return 0 != rc ? rc : ReplyStatus.status;
+    }
+
+    return rc;
+}
+
+
+uint32_t FpTestRun(uint8_t patchcmd, uint8_t *arrResponse, uint32_t size, uint32_t timeout)
+{
+    //Logging::GetLogger()->Log("FpModule FpTestRun()");
+
+    /*
+     *  Combined the command VCSFW_CMD_TEST_RUN + Sub command. 
+     *  Then get the response.
+     */
+
+    uint32_t rc = 0;
+		vcsfw_generic_reply_t ReplyStatus = { 0 };
+		uint32_t replysize = 0;
+
+    uint8_t arrTestRun[4] = { patchcmd, 0, 0, 0 };
+    rc = executeCmd(VCSFW_CMD_TEST_RUN, arrTestRun, 4, arrResponse, size, true, &ReplyStatus.status, &replysize, timeout);
+    if (0 != rc || 0 != ReplyStatus.status)
+    {
+        return 0 != rc ? rc : ReplyStatus.status;
+    }
+
+    return rc;
+}
+
+uint32_t FpTestRun2(uint8_t patchCmd, uint8_t *arrResponse, uint32_t size, uint32_t timeout)
+{
+    //Logging::GetLogger()->Log("FpModule FpTestRun2()");
+
+    /*
+     *  Send command patchCmd directly. 
+     *  Then get the response.
+     */
+
+  uint32_t rc = 0;
+	vcsfw_generic_reply_t ReplyStatus = { 0 };
+	uint32_t replysize = 0;
+
+  rc = executeCmd(patchCmd, NULL, NULL, arrResponse, size, true, &ReplyStatus.status, &replysize, timeout);
+  if (0 != rc || 0 != ReplyStatus.status)
+  {
+        return 0 != rc ? rc : ReplyStatus.status;
+  }
+
+  return rc;
+}
+
 uint32_t FpPowerOn(uint32_t vcc, uint32_t spivcc, uint32_t timeout)
 {
     //Logging::GetLogger()->Log("FpModule PowerOn()");
@@ -298,9 +772,8 @@ uint32_t getStatus(Sensor_Status_t *oSensorStatus)
 
 uint32_t executeCmd(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t *replybufp, uint32_t replybuflen, bool crc, uint16_t *replystatus, uint32_t *replySize, uint32_t timeout)
 {
-//	uint32_t replySize;
-//	return executeCmdExt(cmdname, cmdbufp, buflen, replybufp, replybuflen, crc, replystatus, &replySize, timeout);
-	uint32_t rc = 0;
+
+		uint32_t rc = 0;
     uint32_t timeoutVal = timeout;
 
     command_blob_t cmd;
@@ -363,7 +836,7 @@ uint32_t executeCmd(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t 
         {
             //reduce status bytes
             *replySize = sizeRead - sizeof(uint16_t);
-            if (replySize > 0)
+            if (*replySize > 0)
             {
                 memcpy(replybufp, &(arrRead[sizeof(uint16_t)]), *replySize);
             }
