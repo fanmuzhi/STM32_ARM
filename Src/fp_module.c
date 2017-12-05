@@ -394,7 +394,7 @@ uint32_t FpGetImage(uint8_t *arrImage, uint32_t size, uint8_t *arrParameter, uin
         Can you check the acqnum before issuing the FRAME_READ?  
         The FRAME_ACQ command should set acqnum to 0, and when a frame is available, acqnum will be 1.
      */
-    uint32_t timeoutVal = timeout;
+    uint32_t timeoutVal = 50000;
     Sensor_Status_t Sensor_Status;
     do{
         rc = getStatus(&Sensor_Status);
@@ -741,10 +741,21 @@ uint32_t getStatus(Sensor_Status_t *oSensorStatus)
 {
 //		deassertmcs();
     uint32_t status = 0;
-		ep0status_t ep0val = 0;
-		uint32_t ep0size = EP0SIZE_BIG;
-		uint8_t  cmdbuf[2] = { EPSELBYTE_INTEGRIFY(EPSELBYTE_EP0IN), 0x00 };   /* 0 is dummy byte */
-		status = spiWriteRead(&spi_channel_module, cmdbuf, sizeof(cmdbuf), (uint8_t *)&ep0val, ep0size, 200);
+//		ep0status_t ep0val = 0;
+//		uint32_t ep0size = EP0SIZE_BIG;
+		uint8_t  cmdbuf[2] = { EPSELBYTE_INTEGRIFY(EPSELBYTE_EP0IN), 0 };   /* 0 is dummy byte */
+		status = spiWrite(&spi_channel_module, cmdbuf, sizeof(cmdbuf), false, 2000);
+		if (0 != status)
+    {
+        return status;
+    }
+		ep0status_t ep0val;
+    uint32_t ep0size = EP0SIZE_BIG;
+		uint8_t dummy_cmd[ep0size];
+		memset(dummy_cmd, 0x00, ep0size);
+//		status = spiWrite(&spi_channel_module, dummy_cmd, ep0size, false, 2000);
+//		status = spiRead(&spi_channel_module, (uint8_t *)&ep0val, ep0size, true, 2000);
+		status = spiWriteRead(&spi_channel_module, dummy_cmd, ep0size, (uint8_t *)&ep0val, ep0size, 2000);
     if (0 == status)
     {
         //parse
@@ -887,7 +898,7 @@ uint32_t writeCmd(command_blob_t cmd, bool crc, uint32_t timeout)
 
     //send cmd
 //    rc = _pFpBridge->Write(fullcmdbufp, fullcmdlength, true);
-		rc = spiWrite(&spi_channel_module, fullcmdbufp, fullcmdlength, 200);
+		rc = spiWrite(&spi_channel_module, fullcmdbufp, fullcmdlength, true, 2000);
     free(fullcmdbufp);
 
     return rc;
@@ -901,16 +912,18 @@ uint32_t readCmd(uint8_t *arrRep, uint32_t size, bool crc, uint32_t timeout)
 
 	uint8_t  epSel = EPSELBYTE_INTEGRIFY(EPSELBYTE_EP1IN);
 	uint8_t arrEPSel[2] = { epSel, 0xFF };
+	rc = spiWrite(&spi_channel_module, &(arrEPSel[0]), 2, false, 2000);
 //    rc = _pFpBridge->Write(&(arrEPSel[0]), 2, false);
 	if (0 != rc)
 			return rc;
-
+	
 	// Read reply from the sensor
 	uint32_t replyLength = size + (crc ? sizeof(uint32_t) : 0);
 	uint8_t arrReplyBuf[replyLength];
 	memset(arrReplyBuf, 0, replyLength);
-//    rc = _pFpBridge->Read(arrReplyBuf, replyLength, true);
-	rc = spiWriteRead(&spi_channel_module, &(arrEPSel[0]), 2, arrReplyBuf, replyLength, 200);
+	uint8_t dummy_cmd[replyLength];
+	memset(dummy_cmd, 0xFF, replyLength);
+	rc = spiWriteRead(&spi_channel_module, dummy_cmd, replyLength, arrReplyBuf, replyLength, 2000);
 	if (0 == rc)
 	{
 		//crc

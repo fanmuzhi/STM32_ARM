@@ -10,7 +10,7 @@
 #include <string.h>
 #include "stm32f7xx_hal.h"
 
-
+typedef enum { false, true }bool;
 
 /* ########################## Assert Selection ############################## */
 /**
@@ -182,8 +182,9 @@ int iEnableSPIVCC( int iVoltage );
 int iEnableSENSORVCC( int iVoltage );
 void assert_mcs(Gpio_PortPin_t *spi_mcs_gpio, GPIO_PinState state);	 
 uint32_t spiWriteRead(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint32_t cmdLen, uint8_t * rplBuf, uint32_t rplLen, uint32_t timeout);
-uint32_t spiWrite(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint32_t cmdLen, uint32_t timeout);
-uint32_t spiRead(Spi_Channel_t *spiChannel, uint8_t *rplBuf, uint32_t rplLen, uint32_t timeout);
-
+//uint32_t spiWrite(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint32_t cmdLen, uint32_t timeout);
+uint32_t spiWrite(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint32_t cmdLen, bool deassert_mcs_after, uint32_t timeout);
+//uint32_t spiRead(Spi_Channel_t *spiChannel, uint8_t *rplBuf, uint32_t rplLen, uint32_t timeout);
+uint32_t spiRead(Spi_Channel_t *spiChannel, uint8_t *rplBuf, uint32_t rplLen, bool deassert_mcs_after, uint32_t timeout);
 
 #endif

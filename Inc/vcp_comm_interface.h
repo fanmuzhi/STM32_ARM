@@ -17,9 +17,10 @@
 #define VCP_CMD_SET_LED_TIM				0x11
 #define VCP_CMD_GET_LED_DN 				0x20
 #define VCP_CMD_FP_GETVER					0x50
-#define VCP_CMD_GET_IMG						0x60
-//#define VCP_CMD_GET_IMG_STELLER		0x65
-#define VCP_CMD_IOTA_FIND					0x70
+#define VCP_CMD_IOTA_FIND					0x60
+#define VCP_CMD_GET_IMG						0x70
+//#define VCP_CMD_GET_IMG_STELLER		0x75
+
 
 	 
 #define ERROR_NONE											0x00000000
