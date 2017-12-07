@@ -314,7 +314,8 @@ uint32_t FpFrameStateGet(FrameTagType type, uint8_t *pRespData, uint32_t *oRespS
      * 
      */
     nReplySize = nFullSize + sizeof(frameReply);
-    uint8_t pReplyBuf[nReplySize];
+    uint8_t *pReplyBuf = NULL;
+		pReplyBuf = (uint8_t *) malloc(nReplySize);
     rc = executeCmd(VCSFW_CMD_FRAME_STATE_GET, (uint8_t*)&frameStateCmd, sizeof(frameStateCmd), pReplyBuf, nReplySize, true, &genReply.status, &replysize, nTimeout);
     if (0 != rc || 0 != genReply.status)
     {
@@ -371,12 +372,14 @@ uint32_t FpGetImage(uint8_t *arrImage, uint32_t size, uint8_t *arrParameter, uin
 		uint8_t *arrFrameAcq = NULL;
 		if (NULL == arrParameter || 0 == parameterSize)
 		{
-			uint8_t arrFrameAcq[sizeof(vcsfw_cmd_frame_acq_t)];
+//			uint8_t arrFrameAcq[sizeof(vcsfw_cmd_frame_acq_t)];
+			arrFrameAcq = (uint8_t *) malloc(sizeof(vcsfw_cmd_frame_acq_t));
 			memcpy(arrFrameAcq, &frame_acq, sizeof(vcsfw_cmd_frame_acq_t));
 		}
 		else
 		{
-			uint8_t arrFrameAcq[parameterSize + sizeof(vcsfw_cmd_frame_acq_t)];
+//			uint8_t arrFrameAcq[parameterSize + sizeof(vcsfw_cmd_frame_acq_t)];
+			arrFrameAcq = (uint8_t *) malloc(parameterSize + sizeof(vcsfw_cmd_frame_acq_t));
 			memcpy(arrFrameAcq, &frame_acq, sizeof(vcsfw_cmd_frame_acq_t));
 			memcpy(&(arrFrameAcq[sizeof(vcsfw_cmd_frame_acq_t)]), arrParameter, parameterSize);
 		}
@@ -394,7 +397,7 @@ uint32_t FpGetImage(uint8_t *arrImage, uint32_t size, uint8_t *arrParameter, uin
         Can you check the acqnum before issuing the FRAME_READ?  
         The FRAME_ACQ command should set acqnum to 0, and when a frame is available, acqnum will be 1.
      */
-    uint32_t timeoutVal = 50000;
+    uint32_t timeoutVal = timeout;
     Sensor_Status_t Sensor_Status;
     do{
         rc = getStatus(&Sensor_Status);
@@ -418,9 +421,9 @@ uint32_t FpGetImage(uint8_t *arrImage, uint32_t size, uint8_t *arrParameter, uin
     frame_read.flags = 0;
     frame_read.offset = 0;
     unsigned int replybuflen = size + sizeof(vcsfw_reply_frame_read_t);
-    uint8_t *replybufp = (uint8_t *) malloc(replybuflen);
-		
-    rc = executeCmd(VCSFW_CMD_FRAME_READ, (uint8_t*)&frame_read, sizeof(vcsfw_reply_frame_read_t), replybufp, replybuflen, true, &ReplyStatus.status, &replysize, timeout);
+    uint8_t *replybufp = NULL;
+		replybufp = (uint8_t *) malloc(replybuflen);
+    rc = executeCmd(VCSFW_CMD_FRAME_READ, (uint8_t *)&frame_read, sizeof(vcsfw_reply_frame_read_t), replybufp, replybuflen, true, &ReplyStatus.status, &replysize, timeout);
     
 		if (0 != rc || 0 != ReplyStatus.status)
     {
@@ -498,7 +501,8 @@ uint32_t FpIotafind(uint8_t *arrIotaData,  uint32_t *fullSize, uint32_t IotaType
 
 		uint32_t sizeRead = 0;
 		sizeRead = *fullSize;	//try to read max
-		uint8_t arrRead[sizeRead];
+		uint8_t *arrRead = NULL;
+		arrRead = (uint8_t *) malloc(sizeRead);
 		memset(arrRead, 0, sizeRead);
 
 		uint32_t replySize = 0;	//actual reply size, exclude status 2 bytes
@@ -545,7 +549,8 @@ uint32_t FpIotawrite(uint8_t *arrIotadata, uint32_t size, uint16_t type, uint32_
         vcsfw_cmd_iota_write_t cmd_iota_write;
         memset(&cmd_iota_write, 0, sizeof(vcsfw_cmd_iota_write_t));
         cmd_iota_write.itype = type;
-        uint8_t arrData[size + sizeof(vcsfw_cmd_iota_write_t)];
+        uint8_t *arrData = NULL;
+				arrData = (uint8_t *)malloc(size + sizeof(vcsfw_cmd_iota_write_t));
         memcpy(arrData, &cmd_iota_write, sizeof(vcsfw_cmd_iota_write_t));
         memcpy(&(arrData[sizeof(vcsfw_cmd_iota_write_t)]), arrIotadata, size);
         rc = executeCmd(VCSFW_CMD_IOTA_WRITE, arrData, size + sizeof(vcsfw_cmd_iota_write_t), NULL, 0, true, &ReplyStatus.status, &replysize, timeout);
@@ -741,21 +746,30 @@ uint32_t getStatus(Sensor_Status_t *oSensorStatus)
 {
 //		deassertmcs();
     uint32_t status = 0;
-//		ep0status_t ep0val = 0;
-//		uint32_t ep0size = EP0SIZE_BIG;
 		uint8_t  cmdbuf[2] = { EPSELBYTE_INTEGRIFY(EPSELBYTE_EP0IN), 0 };   /* 0 is dummy byte */
-		status = spiWrite(&spi_channel_module, cmdbuf, sizeof(cmdbuf), false, 2000);
-		if (0 != status)
-    {
-        return status;
-    }
+//		status = spiWrite(&spi_channel_module, cmdbuf, sizeof(cmdbuf), false, 2000);
+//		if (0 != status)
+//    {
+//        return status;
+//    }
 		ep0status_t ep0val;
     uint32_t ep0size = EP0SIZE_BIG;
-		uint8_t dummy_cmd[ep0size];
-		memset(dummy_cmd, 0x00, ep0size);
+
+		uint32_t full_len = sizeof(cmdbuf) + ep0size;
+		uint8_t *full_cmd;
+		full_cmd = (uint8_t *) malloc(full_len);
+		memset(full_cmd, 0x00, full_len);
+		memcpy(&(full_cmd[0]), cmdbuf, sizeof(cmdbuf));
+		
+		uint8_t *full_rpl_buf;
+		full_rpl_buf = (uint8_t *) malloc(full_len);
 //		status = spiWrite(&spi_channel_module, dummy_cmd, ep0size, false, 2000);
 //		status = spiRead(&spi_channel_module, (uint8_t *)&ep0val, ep0size, true, 2000);
-		status = spiWriteRead(&spi_channel_module, dummy_cmd, ep0size, (uint8_t *)&ep0val, ep0size, 2000);
+//		status = spiWriteRead(&spi_channel_module, dummy_cmd, (uint8_t *)&ep0val, ep0size, 2000);
+		status = spiWriteRead(&spi_channel_module, full_cmd, full_rpl_buf, full_len, 2000);
+		memcpy((uint8_t *)&ep0val, &(full_rpl_buf[sizeof(cmdbuf)]), ep0size);
+		free(full_cmd);
+		free(full_rpl_buf);
     if (0 == status)
     {
         //parse
@@ -838,7 +852,8 @@ uint32_t executeCmd(uint8_t cmdname, uint8_t *cmdbufp, uint32_t buflen, uint8_t 
         return rc;
 
     uint32_t sizeRead = Sensor_Status.EP1INSIZE;
-    uint8_t arrRead[sizeRead];
+    uint8_t *arrRead = NULL;
+		arrRead = (uint8_t *) malloc(sizeRead);
     memset(arrRead, 0, sizeRead);
     rc = readCmd(arrRead, sizeRead, crc, timeout);
     if (0 == rc)
@@ -879,7 +894,8 @@ uint32_t writeCmd(command_blob_t cmd, bool crc, uint32_t timeout)
 
     //allocate command buff length = endpoint + command_name + command_data_lenght + crc
     fullcmdlength = sizeof(uint8_t) + sizeof(uint8_t) + cmd.dataLength + (crc ? sizeof(uint32_t) : 0);
-    uint8_t fullcmdbufp[fullcmdlength];
+    uint8_t *fullcmdbufp = NULL;
+		fullcmdbufp = (uint8_t *) malloc(fullcmdlength);
     memset(fullcmdbufp, 0, fullcmdlength);
 
     fullcmdbufp[0] = EPSELBYTE_INTEGRIFY(EPSELBYTE_EP1OUT);     //endpoint 1
@@ -908,22 +924,37 @@ uint32_t writeCmd(command_blob_t cmd, bool crc, uint32_t timeout)
 uint32_t readCmd(uint8_t *arrRep, uint32_t size, bool crc, uint32_t timeout)
 {
 	//read return value from EP1IN 0x23
-	uint32_t rc=0;
+	uint32_t rc = 0;
 
 	uint8_t  epSel = EPSELBYTE_INTEGRIFY(EPSELBYTE_EP1IN);
 	uint8_t arrEPSel[2] = { epSel, 0xFF };
-	rc = spiWrite(&spi_channel_module, &(arrEPSel[0]), 2, false, 2000);
-//    rc = _pFpBridge->Write(&(arrEPSel[0]), 2, false);
-	if (0 != rc)
-			return rc;
+	
+//	rc = spiWrite(&spi_channel_module, &(arrEPSel[0]), 2, false, timeout);
+//	if (0 != rc)
+//			return rc;
 	
 	// Read reply from the sensor
 	uint32_t replyLength = size + (crc ? sizeof(uint32_t) : 0);
-	uint8_t arrReplyBuf[replyLength];
-	memset(arrReplyBuf, 0, replyLength);
-	uint8_t dummy_cmd[replyLength];
-	memset(dummy_cmd, 0xFF, replyLength);
-	rc = spiWriteRead(&spi_channel_module, dummy_cmd, replyLength, arrReplyBuf, replyLength, 2000);
+
+	
+	uint32_t full_cmd_len = sizeof(arrEPSel) + replyLength;
+	uint8_t *full_cmd;
+	full_cmd = (uint8_t *) malloc(full_cmd_len);
+	memset(&(full_cmd[sizeof(arrEPSel)]), 0xFF, full_cmd_len);
+	memcpy(&(full_cmd[0]), arrEPSel, sizeof(arrEPSel));
+
+
+	uint8_t *fullArrRpl = NULL;
+	fullArrRpl = (uint8_t *) malloc(full_cmd_len);
+
+//	rc = spiWriteRead(&spi_channel_module, full_cmd, arrReplyBuf, replyLength, timeout);
+	rc = spiWriteRead(&spi_channel_module, full_cmd, fullArrRpl, full_cmd_len, timeout);
+	free(full_cmd);
+	uint8_t *arrReplyBuf = NULL;
+	arrReplyBuf = (uint8_t *) malloc(replyLength);
+	memcpy(arrReplyBuf, &(fullArrRpl[sizeof(arrEPSel)]), replyLength);
+//	rc = spiRead(&spi_channel_module, arrReplyBuf, replyLength, true, timeout);
+	free(fullArrRpl);
 	if (0 == rc)
 	{
 		//crc
@@ -947,7 +978,7 @@ uint32_t readCmd(uint8_t *arrRep, uint32_t size, bool crc, uint32_t timeout)
 					return ERROR_CRC_VERIFY;
 			}
 
-            memcpy(arrRep, arrReplyBuf, replyLength - sizeof(uint32_t));
+      memcpy(arrRep, arrReplyBuf, replyLength - sizeof(uint32_t));
 		}
 		else
 		{

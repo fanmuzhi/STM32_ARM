@@ -26,7 +26,7 @@
   <config>
     <name>STM32F769IGT</name>				
     <device>STM32F769IGTx</device>		 
-    <heapSize>0x4000</heapSize>
+    <heapSize>0x30000</heapSize>
     <stackSize>0x8000</stackSize>
     
     	<cpuclock>144</cpuclock>

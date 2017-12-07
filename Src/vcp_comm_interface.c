@@ -152,11 +152,11 @@ int8_t VCP_CMD_process()
 //					uint32_t RowNumberUsable = 88;// _dims.frame_linesusable;
 //					uint32_t ColumnNumberUsable = 00;// _dims.line_pixusable;
 					uint32_t rc = 0;
-					uint8_t *arrImage;
+					uint8_t arrImage[rowNumber * columnNumber * 2];
 					rc = FpGetImage(arrImage, rowNumber*columnNumber * 2, (uint8_t *)0, 0U, 1U, 2000);
 					if(0 == rc) 
 					{
-							CDC_Transmit_FS( (uint8_t *)(&arrImage), rowNumber*columnNumber * 2);
+							rc = CDC_Transmit_FS( (uint8_t *)(&arrImage), rowNumber*columnNumber*2);
 					}
 
 					break;

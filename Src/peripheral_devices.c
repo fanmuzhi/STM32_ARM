@@ -255,18 +255,20 @@ void assert_mcs(Gpio_PortPin_t *spi_mcs_gpio, GPIO_PinState state)
 	HAL_GPIO_WritePin(spi_mcs_gpio->gpio_x, spi_mcs_gpio->gpio_pin, state);
 }
 
-uint32_t spiWriteRead(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint32_t cmdLen, uint8_t *rpl, uint32_t rplLen, uint32_t timeout)
+uint32_t spiWriteRead(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint8_t *rpl, uint32_t Len, uint32_t timeout)
 {
 	uint32_t status = 0;
-	uint8_t rplBuf[rplLen];
-//	uint8_t dummy_cmd[rplLen];
-//	memset(dummy_cmd, 0x00, rplLen);
+//	uint8_t rplBuf[0x3800];
+	uint8_t *rplBuf = NULL;
+	rplBuf = (uint8_t *) malloc(Len);
+	
 	assert_mcs(spiChannel->spi_mcs_gpio, GPIO_PIN_RESET);
 //	HAL_Delay(10);
 //	status = HAL_SPI_Transmit(spiChannel->spi_handle, (uint8_t *)&cmdBuf[0], cmdLen, timeout);
-	status = HAL_SPI_TransmitReceive(spiChannel->spi_handle, (uint8_t *)&cmdBuf[0], (uint8_t *)&rplBuf, rplLen, timeout);
-	memcpy(rpl, rplBuf, rplLen);
+	status = HAL_SPI_TransmitReceive(spiChannel->spi_handle, cmdBuf, rplBuf, Len, timeout);
 	assert_mcs(spiChannel->spi_mcs_gpio, GPIO_PIN_SET);
+	memcpy(rpl, rplBuf, Len);
+	free(rplBuf);
 	return status;
 }
 
