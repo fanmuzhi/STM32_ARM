@@ -10,7 +10,9 @@ extern Timer_Led_t led_W;
 extern Timer_Led_t led_IR;
 
 extern Lightness_Gauge_t lightnessGauge;
+extern USBD_HandleTypeDef hUsbDeviceFS;
 extern s_RxBuff_t s_RxBuff;
+
 
 VCP_Light_Reply_t vcp_lightdn_reply	=	{	.error_LightW		= 0xffffffff,
 																				.error_LightIR	= 0xffffffff,
@@ -147,18 +149,22 @@ int8_t VCP_CMD_process()
 				
 				case VCP_CMD_GET_IMG:
 				{
+					uint32_t rc = 0;
 					uint32_t rowNumber = 88;// _dims.frame_nlines;
 					uint32_t columnNumber = 80;// _dims.line_npix;
-//					uint32_t RowNumberUsable = 88;// _dims.frame_linesusable;
-//					uint32_t ColumnNumberUsable = 00;// _dims.line_pixusable;
-					uint32_t rc = 0;
-					uint8_t arrImage[rowNumber * columnNumber * 2];
-					rc = FpGetImage(arrImage, rowNumber*columnNumber * 2, (uint8_t *)0, 0U, 1U, 2000);
+					
+					uint8_t *arrImage = NULL;
+					arrImage = (uint8_t *) malloc( rowNumber * columnNumber * 2 );
+					rc = FpGetImage(arrImage, rowNumber*columnNumber*2, (uint8_t *)0, 0U, 1U, 2000);
 					if(0 == rc) 
 					{
-							rc = CDC_Transmit_FS( (uint8_t *)(&arrImage), rowNumber*columnNumber*2);
+						rc = CDC_Transmit_FS( (uint8_t *)(&arrImage), rowNumber*columnNumber*2);
 					}
-
+					if (0 == rc)
+					{
+						free(arrImage);
+					}
+					
 					break;
 				}
 
