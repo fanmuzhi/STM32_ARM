@@ -136,6 +136,88 @@ typedef enum { false, true }bool;
 #define SENSOR_VCC_3V45         0x04
 #define SENSOR_VCC_3V50         0x03
 
+/* I2C Address and Registers for INA226*/
+#define SPIVCC_I2C_ADDRESS      	0x0080
+#define VCC_I2C_ADDRESS         	0x0082
+#define INA226_CONFIG_REG       	0x00    
+#define INA226_SHUNT_VOLTAGE_REG	0x01   
+#define INA226_BUS_VOLTAGE_REG   	0x02    
+#define INA226_POWER_REG        	0x03    
+#define INA226_CURRENT_REG      	0x04    
+#define INA226_CALIBRATION_REG  	0x05    
+#define INA226_MASKENABLE_REG   	0x06    
+#define INA226_ALERT_LIMIT_REG   	0x07    
+#define INA226_MANUID_REG       	0x08    
+#define INA226_DIEID_REG        	0x09  
+
+//INA226 Register bit definition
+// config rester bit definition, 00h (Read/Write)
+#define REVERSED_BIT_VALUE				0x4000
+#define RESET_BIT									0x8000
+#define AVG_BIT_SETTING						0x0E00
+#define NUMBER_OF_AVG_1						0x0000	// default value
+#define NUMBER_OF_AVG_4						0x0200
+#define NUMBER_OF_AVG_16					0x0400
+#define NUMBER_OF_AVG_64					0x0600
+#define NUMBER_OF_AVG_128					0x0800
+#define NUMBER_OF_AVG_256					0x0A00
+#define NUMBER_OF_AVG_512					0x0C00
+#define NUMBER_OF_AVG_1024				0x0E00
+#define VBUS_CT_BIT_SETTING				0x01C0
+#define VBUS_CT_140uS							0x0000
+#define VBUS_CT_204uS							0x0040
+#define VBUS_CT_332uS							0x0080
+#define VBUS_CT_588uS							0x00C0
+#define VBUS_CT_1100uS						0x0100	// default value
+#define VBUS_CT_2116uS						0x0140
+#define VBUS_CT_4156uS						0x0180
+#define VBUS_CT_8244uS						0x01C0
+#define VSHUNT_CT_BIT_SETTING			0x0038
+#define VSHUNT_CT_140uS						0x0000
+#define VSHUNT_CT_204uS						0x0008
+#define VSHUNT_CT_332uS						0x0010
+#define VSHUNT_CT_588uS						0x0018
+#define VSHUNT_CT_1100uS					0x0020	// default value
+#define VSHUNT_CT_2116uS					0x0021
+#define VSHUNT_CT_4156uS					0x0030
+#define VSHUNT_CT_8244uS					0x0038
+#define MODE_SETTING							0x0007
+#define POWER_DOWN_MODE						0x0000	// requires 40ms full recovery from power-down mode
+#define SHUNT_VOLTAGE_TRIG_MODE		0x0001
+#define BUS_VOLTAGE_TRIG_MODE			0x0002
+#define SHUNT_BUS_TRIG_MODE				0x0003
+//#define POWER_DOWN_MODE						0x0004
+#define SHUNT_VOLT_CONTINU_MODE		0x0005
+#define BUS_VOLT_CONTINU_MODE			0x0006
+#define SHUNT_BUS_CONTINU_MODE		0x0007	// default value
+
+//Mask/Enable bit defination, 06h (Read/Write)
+#define INA226_SOL								0x8000	// Shunt Voltage Over-Voltage
+#define INA226_SUL								0x4000	// Shunt Voltage Under-Voltage
+#define INA226_BOL								0x2000	// Bus Voltage Over-Voltage
+#define INA226_BUL								0x1000	// Bus Voltage Under-Voltage
+#define INA226_POL								0x0800	// Power Over-Limit
+#define INA226_CNVR								0x0400	// Conversion Ready
+#define INA226_AFF								0x0010	// Alert Function Flag
+#define INA226_CVRF								0x0008	// Conversion Ready Flag
+#define INA226_OVF								0x0004	// Math Overflow Flag
+#define INA226_APOL								0x0002	// Alert Polarity bit; sets the Alert pin polarity
+#define INA226_LEN								0x0001	// Alert Latch Enable; configures the latching feature of the Alert pin and Flag bits.
+
+
+#define INA226_ERROR_PARAMETER		10											// error code
+#define INA226_CONFIG_SET_FAIL		11
+
+#define SHUNT_RESISTOR_MILI				0.27										// 0.27ohm
+#define SHUNT_RESISTOR_MICRO			100											// 100ohm
+#define CURRENT_LSB								0.000001	// 1uA				// formula constant define
+
+#define MILI_AMPERE								1												// hardware function selection
+#define MICRO_AMPERE							2
+#define SPI_CHANNEL								1
+#define MODULE_CHANNEL						2
+#define CALIBRATION								1
+#define NON_CALIBRATION						0
 
 extern ADC_HandleTypeDef hadc3;
 

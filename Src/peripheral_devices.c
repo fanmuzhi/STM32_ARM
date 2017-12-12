@@ -19,6 +19,25 @@ extern SPI_HandleTypeDef hspi5;
 extern TIM_HandleTypeDef htim10;
 extern TIM_HandleTypeDef htim11;													
 
+typedef struct MeasureINA226
+{
+	uint8_t ucChannel;
+	uint8_t ucRange;
+	uint8_t ucCalibration;
+	
+	uint16_t usConfigRegValue;
+	uint16_t usMaskEnableRegValue;
+	uint16_t usAlertLimitRegValue;
+	int16_t sCurrentRegValue;
+	int16_t sShuntVoltageRegValue;
+	uint16_t usBusVoltageRegValue;
+	uint16_t usPowerRegValue;
+	
+	float fCurrent;
+	float fShuntVoltage;
+	float fBusVoltage;
+	float fPower;
+}MeasureINA226_t;
 
 Gpio_PortPin_t led_R = {.gpio_x		= GPIOG,
 												.gpio_pin	= GPIO_PIN_2};
@@ -248,6 +267,199 @@ int iEnableSENSORVCC( int iVoltage )
 	 {
 				 return 2;
 	 }
+}
+
+
+uint8_t ucMeasureCurrentS( MeasureINA226_t *INA226_parameter )
+{
+	uint8_t pValue[2] = {0};
+	uint16_t DevAddress, usCalibration_reg;
+	HAL_StatusTypeDef IIC_Status;
+	
+	// power channel selection
+	if( INA226_parameter -> ucChannel == SPI_CHANNEL )
+	{
+		DevAddress = SPIVCC_I2C_ADDRESS;
+	}
+	else if( INA226_parameter -> ucChannel == MODULE_CHANNEL )
+	{
+		DevAddress = VCC_I2C_ADDRESS;
+	}
+	else
+	{
+		return INA226_ERROR_PARAMETER;
+	}
+	
+	// calibration selection
+	if( INA226_parameter -> ucCalibration == NON_CALIBRATION )
+	{
+		HAL_GPIO_WritePin( CALIBRATE_LOW_GPIO_Port, CALIBRATE_LOW_Pin, GPIO_PIN_RESET);	// calibration disable
+	}
+	else if( INA226_parameter -> ucCalibration == CALIBRATION )
+	{
+		// do calibration
+		HAL_GPIO_WritePin( CALIBRATE_LOW_GPIO_Port, CALIBRATE_LOW_Pin, GPIO_PIN_SET);	// calibration enable
+	}
+	else
+	{
+		return INA226_ERROR_PARAMETER;
+	}
+	
+	// range selection
+	if( INA226_parameter -> ucRange == MILI_AMPERE )
+	{
+		HAL_GPIO_WritePin( RANGE_SEL_GPIO_Port, RANGE_SEL_Pin, GPIO_PIN_RESET);	// mA
+	}
+	else if( INA226_parameter -> ucRange == MICRO_AMPERE )
+	{
+		HAL_GPIO_WritePin( RANGE_SEL_GPIO_Port, RANGE_SEL_Pin, GPIO_PIN_SET);	// uA
+	}
+	else
+	{
+		return INA226_ERROR_PARAMETER;
+	}
+			
+	// set Alert Limit register
+	uint8_t pAlertLimit_reg[3] = { INA226_ALERT_LIMIT_REG, ( INA226_parameter -> usAlertLimitRegValue ) >> 8, INA226_parameter -> usAlertLimitRegValue };
+	IIC_Status = HAL_I2C_Master_Transmit( &hi2c2, DevAddress, pAlertLimit_reg, 3, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	IIC_Status = HAL_I2C_Master_Receive( &hi2c2, DevAddress, pValue, 2, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	
+	// set Mask/Enable register
+	uint8_t pMaskEnable_reg[3] = { INA226_MASKENABLE_REG, ( INA226_parameter -> usMaskEnableRegValue ) >> 8, INA226_parameter -> usMaskEnableRegValue };
+	IIC_Status = HAL_I2C_Master_Transmit( &hi2c2, DevAddress, pMaskEnable_reg, 3, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	IIC_Status = HAL_I2C_Master_Receive( &hi2c2, DevAddress, pValue, 2, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	
+	//set calibration_register_value
+	usCalibration_reg = 0.00512 / CURRENT_LSB / ( INA226_parameter -> ucRange == MICRO_AMPERE ? SHUNT_RESISTOR_MICRO : SHUNT_RESISTOR_MILI );
+	//uint8_t pCalibration_reg[3] = { INA226_CALIBRATION_REG, 0, 51 };			// current_LSB = 1uA
+	//uint8_t pCalibration_reg[3] = { INA226_CALIBRATION_REG, 0x08, 0x00 }; // MT used 0x0800 and current_LSB = 0.025uA
+	uint8_t pCalibration_reg[3] = { INA226_CALIBRATION_REG, usCalibration_reg >> 8, usCalibration_reg };
+	IIC_Status = HAL_I2C_Master_Transmit( &hi2c2, DevAddress, pCalibration_reg, 3, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	IIC_Status = HAL_I2C_Master_Receive( &hi2c2, DevAddress, pValue, 2, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+		
+	// config/init INA226, write the config register, will trig the convertion for trigged mode
+	uint8_t pConfig_reg[3] = { INA226_CONFIG_REG, ( INA226_parameter -> usConfigRegValue ) >> 8, INA226_parameter -> usConfigRegValue };
+	IIC_Status = HAL_I2C_Master_Transmit( &hi2c2, DevAddress, pConfig_reg, 3, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	IIC_Status = HAL_I2C_Master_Receive( &hi2c2, DevAddress, pValue, 2, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	if( pValue[0] != INA226_parameter ->usConfigRegValue >> 8 && pValue[1] != INA226_parameter ->usConfigRegValue )
+	{
+		return INA226_CONFIG_SET_FAIL;
+	}
+	
+	// read Mask/Enable register, check convert finish
+	uint8_t regAddress = INA226_MASKENABLE_REG;
+	IIC_Status = HAL_I2C_Master_Transmit( &hi2c2, DevAddress, &regAddress, 1, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	do
+	{
+		IIC_Status = HAL_I2C_Master_Receive( &hi2c2, DevAddress, pValue, 2, 2000 );
+		if( IIC_Status != HAL_OK )
+		{
+			return IIC_Status;
+		}
+		HAL_Delay(10);	// why MUST delay??? otherwise will timeout when repeat call HAL_I2C_Master_Receive() around 1000 times.
+	}while( ( pValue[1] & INA226_CVRF ) == 0 );
+	INA226_parameter -> usMaskEnableRegValue = (( pValue[0] << 8 ) & 0xFF00 ) +  pValue[1];
+	
+	// read current register
+	regAddress = INA226_CURRENT_REG;
+	IIC_Status = HAL_I2C_Master_Transmit( &hi2c2, DevAddress, &regAddress, 1, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	IIC_Status = HAL_I2C_Master_Receive( &hi2c2, DevAddress, pValue, 2, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	INA226_parameter -> sCurrentRegValue = (( pValue[0] << 8 ) & 0xFF00 ) +  pValue[1];
+	INA226_parameter -> fCurrent = INA226_parameter -> sCurrentRegValue * CURRENT_LSB;
+	
+	// read shunt voltage
+	regAddress = INA226_SHUNT_VOLTAGE_REG;
+	IIC_Status = HAL_I2C_Master_Transmit( &hi2c2, DevAddress, &regAddress, 1, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	IIC_Status = HAL_I2C_Master_Receive( &hi2c2, DevAddress, pValue, 2, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	INA226_parameter -> sShuntVoltageRegValue = (( pValue[0] << 8 ) & 0xFF00 ) +  pValue[1];
+	INA226_parameter -> fShuntVoltage = INA226_parameter -> sShuntVoltageRegValue * 2.5 / 1000000;				// LSB = 2.5uV
+	
+	// read BUS voltage
+	regAddress = INA226_BUS_VOLTAGE_REG;
+	IIC_Status = HAL_I2C_Master_Transmit( &hi2c2, DevAddress, &regAddress, 1, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	IIC_Status = HAL_I2C_Master_Receive( &hi2c2, DevAddress, pValue, 2, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	INA226_parameter -> usBusVoltageRegValue = (( pValue[0] << 8 ) & 0xFF00 ) +  pValue[1];
+	INA226_parameter -> fBusVoltage = INA226_parameter -> usBusVoltageRegValue * 1.25 / 1000;							// LSB = 1.25mV
+	
+	// read power
+	regAddress = INA226_POWER_REG;
+	IIC_Status = HAL_I2C_Master_Transmit( &hi2c2, DevAddress, &regAddress, 1, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	IIC_Status = HAL_I2C_Master_Receive( &hi2c2, DevAddress, pValue, 2, 2000 );
+	if( IIC_Status != HAL_OK )
+	{
+		return IIC_Status;
+	}
+	INA226_parameter -> usPowerRegValue = (( pValue[0] << 8 ) & 0xFF00 ) +  pValue[1];
+	INA226_parameter -> fPower = INA226_parameter -> usPowerRegValue * 25 * CURRENT_LSB;									// LSB = 25 * CURRENT_LSB
+	
+	// set the range back to mA
+	HAL_GPIO_WritePin( RANGE_SEL_GPIO_Port, RANGE_SEL_Pin, GPIO_PIN_RESET);	// mA
+	
+	return 0;
 }
 
 void assert_mcs(Gpio_PortPin_t *spi_mcs_gpio, GPIO_PinState state)

@@ -688,9 +688,12 @@ uint32_t FpPowerOn(uint32_t vcc, uint32_t spivcc, uint32_t timeout)
     //Logging::GetLogger()->Log("FpModule PowerOn()");
     uint32_t rc = 0;
 
-		iEnableSPIVCC( spivcc );
-		iEnableSENSORVCC( vcc ) ;
-
+		rc = iEnableSPIVCC( spivcc );
+		if(rc)
+			return rc;
+		
+		rc = iEnableSENSORVCC( vcc ) ;
+		
     return rc;
 }
 
