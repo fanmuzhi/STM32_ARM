@@ -142,6 +142,11 @@ int main(void)
   MX_SPI5_Init();
 
   /* USER CODE BEGIN 2 */
+	HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
+	HAL_Delay(100);
+	HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
+
+
 
 	FpPowerOn( SENSOR_VCC_3V30, SPIVCC_1V80, 2000);
 	HAL_Delay(500);
@@ -362,9 +367,9 @@ static void MX_TIM10_Init(void)
   htim10.Instance = TIM10;
   htim10.Init.Prescaler = 0;
   htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim10.Init.Period = 4096;
+  htim10.Init.Period = 4095;
   htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim10.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim10.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
@@ -399,7 +404,7 @@ static void MX_TIM11_Init(void)
   htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim11.Init.Period = 4095;
   htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim11.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim11.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim11) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);

@@ -301,8 +301,15 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
   if (hcdc->TxState != 0){
     return USBD_BUSY;
   }
+	/* STM CDC 64 bytes packet transmit bug workaround */
+	Len = (0 != Len%64)? Len:Len+1;
+	/* STM CDC 64 bytes packet transmit bug workaround */
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, Buf, Len);
   result = USBD_CDC_TransmitPacket(&hUsbDeviceFS);
+	while(hcdc->TxState != 0)
+	{
+		;
+	}
   /* USER CODE END 7 */ 
   return result;
 }

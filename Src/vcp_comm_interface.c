@@ -17,7 +17,9 @@ extern s_RxBuff_t s_RxBuff;
 VCP_Light_Reply_t vcp_lightdn_reply	=	{	.error_LightW		= 0xffffffff,
 																				.error_LightIR	= 0xffffffff,
 																				.lightnessWDN		= 0xffff,
-																				.lightnessIRDN	= 0xffff };
+																				.lightnessIRDN	= 0xffff,
+																				.ledW_Set 			= 0xffff,
+																				.ledIR_Set			= 0xffff};
 
 VCP_SetLed_Reply_t vcp_setLed_reply	= {	.error					= 0xffffffff,
 																				.lightnessDN		= 0xffff,
@@ -36,10 +38,12 @@ int8_t VCP_CMD_process()
 				// process cmd set led by digital number needed, and return light digital number
 				case VCP_CMD_SET_LED_DN:
 				{
-					vcp_lightdn_reply.error_LightW	= 0xffffffff,
-					vcp_lightdn_reply.error_LightIR	= 0xffffffff,
+					vcp_lightdn_reply.error_LightW	= 0xffffffff;
+					vcp_lightdn_reply.error_LightIR	= 0xffffffff;
 					vcp_lightdn_reply.lightnessWDN	= 0xffff;
 					vcp_lightdn_reply.lightnessIRDN	= 0xffff;
+					vcp_lightdn_reply.ledW_Set 			= 0xffff;
+					vcp_lightdn_reply.ledIR_Set			= 0xffff;
 					if(s_RxBuff.UserRxBufferFS[2] >= 0x10 || s_RxBuff.UserRxBufferFS[4] >= 0x10)
 					{
 						if(s_RxBuff.UserRxBufferFS[2] >= 0x10)
@@ -53,19 +57,12 @@ int8_t VCP_CMD_process()
 						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
 						break;
 					}
-
-					if(s_RxBuff.UserRxBufferFS[4] >= 0x10)
-					{
-						vcp_lightdn_reply.error_LightIR = ERROR_SET_DN_EXCEEDED;
-						CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
-						break;
-					}
 					uint16_t lightnessW_target = (uint16_t)s_RxBuff.UserRxBufferFS[1] + (((uint16_t)s_RxBuff.UserRxBufferFS[2])<<8);
 					uint16_t lightnessIR_target = (uint16_t)s_RxBuff.UserRxBufferFS[3] + (((uint16_t)s_RxBuff.UserRxBufferFS[4])<<8);
 
 					//adjust IR Led to lightnessIR_target
 					vTurnOffLed(&led_W);
-					HAL_Delay(200);
+					HAL_Delay(50);
 //				vTurnOffLed(&led_IR);
 					if (AutoAdjustLed(&led_IR, &lightnessGauge, lightnessIR_target) == -2)
 					{
@@ -76,11 +73,12 @@ int8_t VCP_CMD_process()
 						vcp_lightdn_reply.error_LightIR = lightnessGauge.gauge_handle->ErrorCode;
 					}
 					vcp_lightdn_reply.lightnessIRDN = lightnessGauge.result_dn;
-
+					vcp_lightdn_reply.ledIR_Set = led_IR.last_led_tim_val;
+					uint16_t irPWM_tuned = led_IR.last_led_tim_val;
+					
 					//adjust W Led to lightness_target
-//				vTurnOffLed(&led_W);
 					vTurnOffLed(&led_IR);
-					HAL_Delay(200);
+					HAL_Delay(50);
 					if (AutoAdjustLed(&led_W, &lightnessGauge, lightnessW_target) == -2)
 					{
 						vcp_lightdn_reply.error_LightW = ERROR_ADJUST_TO_TARGET_FAIL;
@@ -90,8 +88,11 @@ int8_t VCP_CMD_process()
 						vcp_lightdn_reply.error_LightW = lightnessGauge.gauge_handle->ErrorCode;
 					}
 					vcp_lightdn_reply.lightnessWDN = lightnessGauge.result_dn;
-					vTurnOnLed(&led_W, led_W.last_led_tim_val);		//re-light on IR LED again
-					vTurnOnLed(&led_IR, led_IR.last_led_tim_val);		//re-light on IR LED again
+					vcp_lightdn_reply.ledW_Set = led_W.last_led_tim_val;
+					uint16_t wPWM_tuned = led_W.last_led_tim_val;
+					
+					vTurnOnLed(&led_W, wPWM_tuned);		//re-light on IR LED again
+					vTurnOnLed(&led_IR, irPWM_tuned);		//re-light on IR LED again
 
 					CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
 					break;
@@ -100,6 +101,9 @@ int8_t VCP_CMD_process()
 
 				case VCP_CMD_SET_LED_TIM:						//process cmd set led lightness by timer number, and return light digital number
 				{
+					vcp_setLed_reply.error = 0xffffffff;
+					vcp_setLed_reply.lightnessDN		= 0xffff;
+					vcp_setLed_reply.unused					= 0xffff;
 					if(s_RxBuff.UserRxBufferFS[2] >= 0x10 || s_RxBuff.UserRxBufferFS[4] >= 0x10)
 					{
 						vcp_setLed_reply.error = ERROR_SET_DN_EXCEEDED;
@@ -108,7 +112,7 @@ int8_t VCP_CMD_process()
 					}
 					vTurnOnLed(&led_W, (uint16_t)s_RxBuff.UserRxBufferFS[1] + (((uint16_t)s_RxBuff.UserRxBufferFS[2])<<8));
 					vTurnOnLed(&led_IR, (uint16_t)s_RxBuff.UserRxBufferFS[3] + (((uint16_t)s_RxBuff.UserRxBufferFS[4])<<8));
-					HAL_Delay(200);
+					HAL_Delay(50);
 					GetLightness(&lightnessGauge);
 
 					vcp_setLed_reply.error = lightnessGauge.gauge_handle->ErrorCode;
@@ -120,6 +124,9 @@ int8_t VCP_CMD_process()
 
 				case VCP_CMD_GET_LED_DN:			// process cmd get led digtal number back , and return light digital number
 				{
+					vcp_setLed_reply.error = 0xffffffff;
+					vcp_setLed_reply.lightnessDN		= 0xffff;
+					vcp_setLed_reply.unused					= 0xffff;
 					GetLightness(&lightnessGauge);
 					vcp_setLed_reply.error = lightnessGauge.gauge_handle->ErrorCode;
 					vcp_setLed_reply.lightnessDN = lightnessGauge.result_dn;
@@ -158,7 +165,7 @@ int8_t VCP_CMD_process()
 					rc = FpGetImage(arrImage, rowNumber*columnNumber*2, (uint8_t *)0, 0U, 1U, 2000);
 					if(0 == rc) 
 					{
-						rc = CDC_Transmit_FS( (uint8_t *)(&arrImage), rowNumber*columnNumber*2);
+						rc = CDC_Transmit_FS( arrImage, rowNumber*columnNumber*2);
 					}
 					if (0 == rc)
 					{

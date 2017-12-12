@@ -42,7 +42,7 @@ Timer_Led_t led_IR	= {	.tim_handle				= &htim11,
 
 Lightness_Gauge_t lightnessGauge		=	{	.gauge_handle		= &hadc3,
 																				.result_dn			= 0x0000,
-																				.gaugeMinScale	= 0x0C };
+																				.gaugeMinScale	= 0x06 };
 																		
 
 Gpio_PortPin_t	mcs_spi5 ={	.gpio_x		= SPI5_CS_GPIO_Port,
@@ -141,7 +141,7 @@ int32_t AutoAdjustLed(Timer_Led_t *ledTimer, Lightness_Gauge_t *lightGauge, uint
 	if(dn_target == DN_LED_MIN || dn_target == DN_LED_MAX)
 	{
 		vTurnOnLed(ledTimer, dn_target);
-		HAL_Delay(200);
+		HAL_Delay(50);
 		GetLightness(lightGauge);
 		if (abs(lightGauge->result_dn - dn_target) > lightGauge->gaugeMinScale)
 		{
@@ -163,7 +163,7 @@ int32_t AutoAdjustLed(Timer_Led_t *ledTimer, Lightness_Gauge_t *lightGauge, uint
 		}
 		uint16_t led_middle = (led_low + led_high) / 2;
 		vTurnOnLed(ledTimer, led_middle);
-		HAL_Delay(200);
+		HAL_Delay(50);
 		GetLightness(lightGauge);
 		if (lightGauge->gauge_handle->ErrorCode != 0)
 		{
@@ -263,7 +263,7 @@ uint32_t spiWriteRead(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint8_t *rpl, 
 	rplBuf = (uint8_t *) malloc(Len);
 	
 	assert_mcs(spiChannel->spi_mcs_gpio, GPIO_PIN_RESET);
-//	HAL_Delay(10);
+//	HAL_Delay(50);
 //	status = HAL_SPI_Transmit(spiChannel->spi_handle, (uint8_t *)&cmdBuf[0], cmdLen, timeout);
 	status = HAL_SPI_TransmitReceive(spiChannel->spi_handle, cmdBuf, rplBuf, Len, timeout);
 	assert_mcs(spiChannel->spi_mcs_gpio, GPIO_PIN_SET);

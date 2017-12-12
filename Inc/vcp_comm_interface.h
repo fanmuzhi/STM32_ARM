@@ -32,6 +32,8 @@ typedef struct{	uint32_t	error_LightW;
 								uint32_t	error_LightIR;
 								uint16_t	lightnessWDN;
 								uint16_t	lightnessIRDN;
+								uint16_t	ledW_Set;
+								uint16_t	ledIR_Set;
 }VCP_Light_Reply_t;
 
 typedef struct{	uint32_t	error;
