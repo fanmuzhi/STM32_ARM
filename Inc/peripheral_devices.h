@@ -267,6 +267,6 @@ uint32_t spiWriteRead(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint8_t *rpl, 
 //uint32_t spiWrite(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint32_t cmdLen, uint32_t timeout);
 uint32_t spiWrite(Spi_Channel_t *spiChannel, uint8_t *cmdBuf, uint32_t cmdLen, bool deassert_mcs_after, uint32_t timeout);
 //uint32_t spiRead(Spi_Channel_t *spiChannel, uint8_t *rplBuf, uint32_t rplLen, uint32_t timeout);
-uint32_t spiRead(Spi_Channel_t *spiChannel, uint8_t *rplBuf, uint32_t rplLen, bool deassert_mcs_after, uint32_t timeout);
+uint32_t spiRead(Spi_Channel_t *spiChannel, uint8_t *rpl, uint32_t rplLen, bool deassert_mcs_after, uint32_t timeout);
 
 #endif

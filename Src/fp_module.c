@@ -747,32 +747,15 @@ uint32_t FpGetVersion(uint8_t *arrVersion, uint32_t size, uint32_t timeout)
 
 uint32_t getStatus(Sensor_Status_t *oSensorStatus)
 {
-//		deassertmcs();
     uint32_t status = 0;
-		uint8_t  cmdbuf[2] = { EPSELBYTE_INTEGRIFY(EPSELBYTE_EP0IN), 0 };   /* 0 is dummy byte */
-//		status = spiWrite(&spi_channel_module, cmdbuf, sizeof(cmdbuf), false, 2000);
-//		if (0 != status)
-//    {
-//        return status;
-//    }
+		uint8_t  cmdbuf[2] = { EPSELBYTE_INTEGRIFY(EPSELBYTE_EP0IN), 0xff };   /* 0 is dummy byte */
+
 		ep0status_t ep0val;
     uint32_t ep0size = EP0SIZE_BIG;
 
-		uint32_t full_len = sizeof(cmdbuf) + ep0size;
-		uint8_t *full_cmd;
-		full_cmd = (uint8_t *) malloc(full_len);
-		memset(full_cmd, 0x00, full_len);
-		memcpy(&(full_cmd[0]), cmdbuf, sizeof(cmdbuf));
+		status = spiWrite(&spi_channel_module, cmdbuf, 2, false, 2000);
+		status = spiRead(&spi_channel_module, (uint8_t *)&ep0val, ep0size, true, 2000);
 		
-		uint8_t *full_rpl_buf;
-		full_rpl_buf = (uint8_t *) malloc(full_len);
-//		status = spiWrite(&spi_channel_module, dummy_cmd, ep0size, false, 2000);
-//		status = spiRead(&spi_channel_module, (uint8_t *)&ep0val, ep0size, true, 2000);
-//		status = spiWriteRead(&spi_channel_module, dummy_cmd, (uint8_t *)&ep0val, ep0size, 2000);
-		status = spiWriteRead(&spi_channel_module, full_cmd, full_rpl_buf, full_len, 2000);
-		memcpy((uint8_t *)&ep0val, &(full_rpl_buf[sizeof(cmdbuf)]), ep0size);
-		free(full_cmd);
-		free(full_rpl_buf);
     if (0 == status)
     {
         //parse
@@ -932,39 +915,21 @@ uint32_t readCmd(uint8_t *arrRep, uint32_t size, bool crc, uint32_t timeout)
 	uint8_t  epSel = EPSELBYTE_INTEGRIFY(EPSELBYTE_EP1IN);
 	uint8_t arrEPSel[2] = { epSel, 0xFF };
 	
-//	rc = spiWrite(&spi_channel_module, &(arrEPSel[0]), 2, false, timeout);
-//	if (0 != rc)
-//			return rc;
-	
 	// Read reply from the sensor
 	uint32_t replyLength = size + (crc ? sizeof(uint32_t) : 0);
+	uint8_t *ArrRpl = NULL;
+	ArrRpl = (uint8_t *) malloc(replyLength);
 
+	rc = spiWrite(&spi_channel_module, arrEPSel, sizeof(arrEPSel), false, timeout);
+	rc = spiRead(&spi_channel_module, ArrRpl, replyLength, true, timeout);
 	
-	uint32_t full_cmd_len = sizeof(arrEPSel) + replyLength;
-	uint8_t *full_cmd;
-	full_cmd = (uint8_t *) malloc(full_cmd_len);
-	memset(&(full_cmd[sizeof(arrEPSel)]), 0xFF, full_cmd_len);
-	memcpy(&(full_cmd[0]), arrEPSel, sizeof(arrEPSel));
-
-
-	uint8_t *fullArrRpl = NULL;
-	fullArrRpl = (uint8_t *) malloc(full_cmd_len);
-
-//	rc = spiWriteRead(&spi_channel_module, full_cmd, arrReplyBuf, replyLength, timeout);
-	rc = spiWriteRead(&spi_channel_module, full_cmd, fullArrRpl, full_cmd_len, timeout);
-	free(full_cmd);
-	uint8_t *arrReplyBuf = NULL;
-	arrReplyBuf = (uint8_t *) malloc(replyLength);
-	memcpy(arrReplyBuf, &(fullArrRpl[sizeof(arrEPSel)]), replyLength);
-//	rc = spiRead(&spi_channel_module, arrReplyBuf, replyLength, true, timeout);
-	free(fullArrRpl);
 	if (0 == rc)
 	{
 		//crc
 		if (crc)
 		{
 			uint32_t crcVal = 0;
-			memcpy(&crcVal, &(arrReplyBuf[replyLength - sizeof(uint32_t)]), sizeof(uint32_t));
+			memcpy(&crcVal, &(ArrRpl[replyLength - sizeof(uint32_t)]), sizeof(uint32_t));
 
 			// Check the CRC-32 on the received data and make sure it's good.
 			uint32_t localcrc = 0;
@@ -974,22 +939,22 @@ uint32_t readCmd(uint8_t *arrRep, uint32_t size, bool crc, uint32_t timeout)
 			 */
 			uint32_t ep1inlen = size;
 			//localcrc = crc32_calc((const uint8_t *)&ep1inlen, sizeof(uint32_t), ~0UL);
-			localcrc = crc32_calc(arrReplyBuf, ep1inlen, ~0UL);
+			localcrc = crc32_calc(ArrRpl, ep1inlen, ~0UL);
 			//wprintf(L"REPLY_READCRC: over %u bytes read CRC 0x%08lx, expecting 0x%08lx\n", ep1inlen, BIGTOHOST32(&crcVal), localcrc);
 			if (BIGTOHOST32(&crcVal) != localcrc)
 			{
 					return ERROR_CRC_VERIFY;
 			}
 
-      memcpy(arrRep, arrReplyBuf, replyLength - sizeof(uint32_t));
+      memcpy(arrRep, ArrRpl, replyLength - sizeof(uint32_t));
 		}
 		else
 		{
-				memcpy(arrRep, arrReplyBuf, replyLength);
+				memcpy(arrRep, ArrRpl, replyLength);
 		}
   }
 
-	free(arrReplyBuf);
+	free(ArrRpl);
 	return rc;
 }
 

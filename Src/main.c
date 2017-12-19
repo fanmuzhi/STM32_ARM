@@ -160,7 +160,7 @@ int main(void)
 	//HAL_Delay( 200 );
 	//HAL_GPIO_WritePin( G_GPIO_Port, G_Pin, GPIO_PIN_RESET);
 
-	if( !FpPowerOn( SENSOR_VCC_3V30, SPIVCC_1V80, 2000))
+	if( FpPowerOn( SENSOR_VCC_3V30, SPIVCC_1V80, 2000) )
 	{
 		HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
 		HAL_Delay(5000);
