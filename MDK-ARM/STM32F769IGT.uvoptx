@@ -152,7 +152,7 @@
           <Type>0</Type>
           <LineNumber>154</LineNumber>
           <EnabledFlag>1</EnabledFlag>
-          <Address>134243770</Address>
+          <Address>134243778</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
@@ -166,9 +166,9 @@
         <Bp>
           <Number>1</Number>
           <Type>0</Type>
-          <LineNumber>152</LineNumber>
+          <LineNumber>153</LineNumber>
           <EnabledFlag>1</EnabledFlag>
-          <Address>134243752</Address>
+          <Address>134243764</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
@@ -177,7 +177,7 @@
           <BreakIfRCount>1</BreakIfRCount>
           <Filename>..\Src\vcp_comm_interface.c</Filename>
           <ExecCommand></ExecCommand>
-          <Expression>\\STM32F769IGT\../Src/vcp_comm_interface.c\152</Expression>
+          <Expression>\\STM32F769IGT\../Src/vcp_comm_interface.c\153</Expression>
         </Bp>
       </Breakpoint>
       <WatchWindow1>
@@ -225,6 +225,11 @@
           <count>8</count>
           <WinNumber>1</WinNumber>
           <ItemText>arrIotadata</ItemText>
+        </Ww>
+        <Ww>
+          <count>9</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>iota_find</ItemText>
         </Ww>
       </WatchWindow1>
       <MemoryWindow1>
