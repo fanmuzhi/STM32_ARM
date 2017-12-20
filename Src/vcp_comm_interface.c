@@ -148,9 +148,11 @@ int8_t VCP_CMD_process()
 //					uint32_t rc = 0;
 					//try find only one IOTA
 					uint8_t *arrIotadata = NULL;
+					arrIotadata = (uint8_t *) malloc(0);
 					uint32_t replyLength = 0;
 					FpIotafind(arrIotadata, &replyLength, 0U, 2000);
-					CDC_Transmit_FS( (uint8_t *)(&arrIotadata), replyLength);
+					CDC_Transmit_FS(arrIotadata, replyLength);
+					free(arrIotadata);
 					break;
 				}
 				

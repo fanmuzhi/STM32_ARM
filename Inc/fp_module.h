@@ -96,7 +96,7 @@ uint32_t FpFrameStateGet(FrameTagType type, uint8_t *pRespData, uint32_t *oRespS
 
 uint32_t FpGetImage(uint8_t *arrImage, uint32_t size, uint8_t *arrParameter, uint32_t parameterSize, uint32_t nframes, uint32_t timeout);
 
-uint32_t FpIotafind(uint8_t *arrIotaData,  uint32_t *fullSize, uint32_t IotaType, uint32_t timeout);
+uint32_t FpIotafind(uint8_t * arrIotaData,  uint32_t *fullSize, uint32_t IotaType, uint32_t timeout);
 
 uint32_t FpIotawrite(uint8_t *arrIotadata, uint32_t size, uint16_t type, uint32_t timeout);
 

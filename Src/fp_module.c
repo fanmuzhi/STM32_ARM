@@ -457,7 +457,7 @@ uint32_t FpGetImage(uint8_t *arrImage, uint32_t size, uint8_t *arrParameter, uin
         IotaType    [in]   - IOTA_ITYPE, 0 = search all 
         timeout     [in]   - time out period
 */
-uint32_t FpIotafind(uint8_t *arrIotaData,  uint32_t *fullSize, uint32_t IotaType, uint32_t timeout)
+uint32_t FpIotafind(uint8_t* arrIotaData,  uint32_t *fullSize, uint32_t IotaType, uint32_t timeout)
 {
     uint32_t rc = 0;
 		vcsfw_generic_reply_t ReplyStatus = { 0 };
@@ -486,7 +486,7 @@ uint32_t FpIotafind(uint8_t *arrIotaData,  uint32_t *fullSize, uint32_t IotaType
 		return 0 != rc ? rc : ReplyStatus.status;
 	}
 	*fullSize = iota_find_reply_length.fullsize;
-
+	arrIotaData = (uint8_t *) malloc(*fullSize);
 	//realloc the receive buffer size if needed.
 	//if parameter arrIotaData is not NULL, may have memory leakage issue.
 	//uint8_t arrIotaData[fullSize];
