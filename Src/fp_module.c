@@ -748,7 +748,7 @@ uint32_t FpGetVersion(uint8_t *arrVersion, uint32_t size, uint32_t timeout)
 uint32_t getStatus(Sensor_Status_t *oSensorStatus)
 {
     uint32_t status = 0;
-		uint8_t  cmdbuf[2] = { EPSELBYTE_INTEGRIFY(EPSELBYTE_EP0IN), 0xff };   /* 0 is dummy byte */
+		uint8_t  cmdbuf[2] = { EPSELBYTE_INTEGRIFY(EPSELBYTE_EP0IN), 0 };   /* 0 is dummy byte */
 
 		ep0status_t ep0val;
     uint32_t ep0size = EP0SIZE_BIG;
