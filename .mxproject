@@ -1,7 +1,7 @@
 [PreviousGenFiles]
-HeaderPath=D:/GitHub/STM32_ARM/Inc
+HeaderPath=D:/STMicro/software/Henry/STM32_ARM/Inc
 HeaderFiles=usb_device.h;usbd_conf.h;usbd_desc.h;usbd_cdc_if.h;stm32f4xx_it.h;stm32f4xx_hal_conf.h;main.h;stm32f7xx_it.h;stm32f7xx_hal_conf.h;
-SourcePath=D:/GitHub/STM32_ARM/Src
+SourcePath=D:/STMicro/software/Henry/STM32_ARM/Src
 SourceFiles=usb_device.h;usbd_conf.h;usbd_desc.h;usbd_cdc_if.h;stm32f4xx_it.h;stm32f4xx_hal_conf.h;main.h;usb_device.c;usbd_conf.c;usbd_desc.c;usbd_cdc_if.c;stm32f4xx_it.c;stm32f4xx_hal_msp.c;main.c;stm32f7xx_it.c;stm32f7xx_hal_msp.c;
 
 [PreviousLibFiles]

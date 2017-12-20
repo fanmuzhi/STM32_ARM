@@ -95,6 +95,12 @@
 #define SPIVCC_400mV_GPIO_Port GPIOC
 #define SPIVCC_1600mV_Pin GPIO_PIN_5
 #define SPIVCC_1600mV_GPIO_Port GPIOC
+#define R_Pin GPIO_PIN_2
+#define R_GPIO_Port GPIOG
+#define G_Pin GPIO_PIN_3
+#define G_GPIO_Port GPIOG
+#define B_Pin GPIO_PIN_4
+#define B_GPIO_Port GPIOG
 #define KEY2_Pin GPIO_PIN_9
 #define KEY2_GPIO_Port GPIOC
 #define KEY2_EXTI_IRQn EXTI9_5_IRQn
