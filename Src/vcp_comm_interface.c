@@ -35,9 +35,64 @@ int8_t VCP_CMD_process()
 		{
 			switch(s_RxBuff.UserRxBufferFS[0])
 			{
+				case VCP_FPBRIDGE_CMD_OPEN:
+				{	
+					break;
+				}
+				case VCP_FPBRIDGE_CMD_CLOSE:
+				{		
+					break;
+				}
+				
+				case VCP_FPBRIDGE_CMD_GET_IDENTITY:
+				{	
+					break;
+				}
+				
+				case VCP_FPBRIDGE_CMD_SETVOLTAGES:
+				{	
+					
+					break;
+				}
+				
+				case VCP_FPBRIDGE_CMD_SETVOLTAGEPP3V3:
+				{		
+					break;
+				}
+				
+				case VCP_FPBRIDGE_CMD_SETVOLTAGEPP1V8:
+				{		
+					break;
+				}
+				
+				case VCP_FPBRIDGE_CMD_SET_GPIO:
+				{		
+					break;
+				}
+				
+				case VCP_FPBRIDGE_CMD_CHECK_GPIO:
+				{		
+					break;
+				}
+				
+				case VCP_FPBRIDGE_CMD_GETCURRENTVALUES:
+				{		
+					break;
+				}
+				
+				case VCP_FPBRIDGE_CMD_WRITE:
+				{		
+					break;
+				}
+				
+				case VCP_FPBRIDGE_CMD_READ:
+				{		
+					break;
+				}
+				
 				// process cmd set led by digital number needed, and return light digital number
 				case VCP_CMD_SET_LED_DN:
-				{
+				{	
 					vcp_lightdn_reply.error_LightW	= 0xffffffff;
 					vcp_lightdn_reply.error_LightIR	= 0xffffffff;
 					vcp_lightdn_reply.lightnessWDN	= 0xffff;
@@ -97,10 +152,9 @@ int8_t VCP_CMD_process()
 					CDC_Transmit_FS((uint8_t *)(&vcp_lightdn_reply), sizeof(vcp_lightdn_reply));      //send back the detected light adc value
 					break;
 				}
-
-
+				
 				case VCP_CMD_SET_LED_TIM:						//process cmd set led lightness by timer number, and return light digital number
-				{
+				{	
 					vcp_setLed_reply.error = 0xffffffff;
 					vcp_setLed_reply.lightnessDN		= 0xffff;
 					vcp_setLed_reply.unused					= 0xffff;
@@ -120,10 +174,9 @@ int8_t VCP_CMD_process()
 					CDC_Transmit_FS( (uint8_t *)(&vcp_setLed_reply), sizeof(VCP_SetLed_Reply_t));       //send back the detected light adc value
 					break;
 				}
-
-
+				
 				case VCP_CMD_GET_LED_DN:			// process cmd get led digtal number back , and return light digital number
-				{
+				{	
 					vcp_setLed_reply.error = 0xffffffff;
 					vcp_setLed_reply.lightnessDN		= 0xffff;
 					vcp_setLed_reply.unused					= 0xffff;
@@ -135,8 +188,7 @@ int8_t VCP_CMD_process()
 				}
 
 				case VCP_CMD_FP_GETVER:
-				{
-//					uint32_t rc = 0;
+				{	
 					vcsfw_reply_get_version_t version;
 					FpGetVersion((uint8_t*)&version, sizeof(vcsfw_reply_get_version_t), 2000U);
 					CDC_Transmit_FS( (uint8_t *)(&version), sizeof(version));
@@ -144,9 +196,7 @@ int8_t VCP_CMD_process()
 				}
 				
 				case VCP_CMD_IOTA_FIND:
-				{
-//					uint32_t rc = 0;
-					//try find only one IOTA
+				{	
 					uint8_t *arrIotadata = NULL;
 					arrIotadata = (uint8_t *) malloc(0);
 					uint32_t replyLength = 0;
@@ -157,7 +207,7 @@ int8_t VCP_CMD_process()
 				}
 				
 				case VCP_CMD_GET_IMG:
-				{
+				{	
 					uint32_t rc = 0;
 					uint32_t rowNumber = 88;// _dims.frame_nlines;
 					uint32_t columnNumber = 80;// _dims.line_npix;
@@ -176,7 +226,7 @@ int8_t VCP_CMD_process()
 					
 					break;
 				}
-
+				
 				default:
 					break;
 			}

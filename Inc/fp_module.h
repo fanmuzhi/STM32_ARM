@@ -26,8 +26,6 @@
 #define ERROR_REPLY_LENGTH_TOO_SHORT	0x1507
 #define ERROR_NOT_IMPLEMENTED			0x1508
 
-//typedef enum { false, true }bool;
-
 typedef struct SensorStatus_s
 {
 	uint32_t SOFTSTATE;

@@ -75,6 +75,10 @@
 #define VCC_EN_GPIO_Port GPIOI
 #define SPIVCC_EN_Pin GPIO_PIN_11
 #define SPIVCC_EN_GPIO_Port GPIOI
+#define SLEEP_N_Pin GPIO_PIN_4
+#define SLEEP_N_GPIO_Port GPIOF
+#define DRDY_Pin GPIO_PIN_5
+#define DRDY_GPIO_Port GPIOF
 #define SPI5_CS_Pin GPIO_PIN_6
 #define SPI5_CS_GPIO_Port GPIOF
 #define SPIVCC_200mV_Pin GPIO_PIN_0
@@ -95,6 +99,14 @@
 #define SPIVCC_400mV_GPIO_Port GPIOC
 #define SPIVCC_1600mV_Pin GPIO_PIN_5
 #define SPIVCC_1600mV_GPIO_Port GPIOC
+#define GPIO4_Pin GPIO_PIN_0
+#define GPIO4_GPIO_Port GPIOB
+#define GPIO5_Pin GPIO_PIN_1
+#define GPIO5_GPIO_Port GPIOB
+#define GPIO6_Pin GPIO_PIN_11
+#define GPIO6_GPIO_Port GPIOF
+#define GPIO7_Pin GPIO_PIN_12
+#define GPIO7_GPIO_Port GPIOF
 #define R_Pin GPIO_PIN_2
 #define R_GPIO_Port GPIOG
 #define G_Pin GPIO_PIN_3
@@ -111,6 +123,12 @@
 #define VCC_50mV_GPIO_Port GPIOE
 #define VCC_100mV_Pin GPIO_PIN_1
 #define VCC_100mV_GPIO_Port GPIOE
+#define GPIO3_Pin GPIO_PIN_4
+#define GPIO3_GPIO_Port GPIOI
+#define GPIO2_Pin GPIO_PIN_5
+#define GPIO2_GPIO_Port GPIOI
+#define GPIO1_Pin GPIO_PIN_6
+#define GPIO1_GPIO_Port GPIOI
 #define CALIBRATE_LOW_Pin GPIO_PIN_7
 #define CALIBRATE_LOW_GPIO_Port GPIOI
 
